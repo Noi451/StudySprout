@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_spacing.dart';
+import '../../goals/domain/goal_store_provider.dart';
 import 'widgets/goal_card.dart';
 import 'widgets/start_study_button.dart';
 import 'widgets/streak_card.dart';
@@ -10,20 +11,19 @@ import 'widgets/xp_card.dart';
 
 /// หน้าหลัก (Home) — แท็บที่ 1
 ///
-/// Milestone 3: UI Polish & Design System — ปรับให้แอปมี Identity
-/// ยังไม่มี business logic ใด ๆ ทุกค่าระยะ/รัศมีดึงจาก Design System ใน `core/theme/`
+/// Milestone 4: ถ้ามีเป้าหมาย → Goal Card แสดงเป้าหมายล่าสุดแทน "No Goal Yet"
 ///
-/// โครงหน้าประกอบด้วย 6 ส่วน แยกเป็น widget ย่อยใน `widgets/`:
-///  1. [WelcomeSection]  — ข้อความต้อนรับ
-///  2. [TreeSection]      — ต้นไม้กึ่งกลาง (วงกลม halo + placeholder)
-///  3. [XpCard] + [StreakCard] — การ์ดสถิติ วางคู่กัน 2 คอลัมน์
-///  4. [GoalCard]         — เป้าหมายของวันนี้ (empty state)
-///  5. [StartStudyButton] — ปุ่มเริ่มเรียนด้านล่าง
+/// ดึงเป้าหมายล่าสุดจาก [GoalStore] กลาง (ส่งผ่าน [GoalStoreProvider])
+/// เมื่อผู้ใช้สร้างเป้าหมายที่ Goals Page หน้านี้จะอัปเดตอัตโนมัติ
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // ดึงเป้าหมายล่าสุดจาก store กลาง — rebuild อัตโนมัติเมื่อ store เปลี่ยน
+    final store = GoalStoreProvider.of(context);
+    final latestGoal = store.latestGoal;
+
     return Scaffold(
       // ไม่มี AppBar เพื่อให้หน้าดูสะอาด มีพื้นที่ว่างเยอะตามสไตล์ calm/minimal
       body: SafeArea(
@@ -45,7 +45,6 @@ class HomePage extends StatelessWidget {
               const Expanded(child: TreeSection()),
 
               // 3. XP + Streak วางคู่กัน 2 คอลัมน์
-              //    หุ้มด้วย IntrinsicHeight ให้ทั้งสองการ์ดสูงเท่ากัน
               const IntrinsicHeight(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -58,8 +57,8 @@ class HomePage extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
 
-              // 4. เป้าหมายของวันนี้
-              const GoalCard(),
+              // 4. เป้าหมายของวันนี้ — แสดงเป้าหมายล่าสุด หรือ empty state
+              GoalCard(goal: latestGoal),
 
               const SizedBox(height: AppSpacing.xxl),
 
