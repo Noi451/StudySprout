@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_styles.dart';
+
 /// การ์ด "เป้าหมายของวันนี้" ของหน้า Home
 ///
-/// แสดงสถานะว่ายังไม่มีเป้าหมาย — "No Goal Yet" และคำชวน "Create your first goal"
+/// สถานะว่าง (Empty State): ยังไม่มีเป้าหมาย
+/// ดีไซน์เป็น Productivity App — มีไอคอนในวงกลมพื้นหลัง ข้อความบอกสถานะ
+/// และคำชวน "Create your first goal"
 /// ยังไม่มี logic สร้าง/โหลดเป้าหมายจริง — เป็น UI เพียงอย่างเดียว
 class GoalCard extends StatelessWidget {
   const GoalCard({super.key});
@@ -11,50 +18,48 @@ class GoalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
+    final cardShadow = [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.06),
+        blurRadius: 12,
+        offset: const Offset(0, 4),
+      ),
+    ];
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        // พื้นหลังโทนเทาอ่อน ใกล้พื้นหลัง เน้นความ "ว่าง"
+        color: AppColors.emptyGoalSurface,
+        borderRadius: AppRadius.card,
+        boxShadow: cardShadow,
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
           children: [
-            // ไอคอนธง — สื่อถึง "เป้าหมาย"
-            Icon(
-              Icons.flag_outlined,
-              color: theme.colorScheme.primary,
-              size: 32,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // หัวข้อการ์ด
-                  Text(
-                    "Today's Goal",
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  // สถานะ "ยังไม่มีเป้าหมาย"
-                  Text(
-                    'No Goal Yet',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  // คำชวนสร้างเป้าหมายแรก
-                  Text(
-                    'Create your first goal',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+            // ไอคอนธงในวงกลมพื้นหลัง — สื่อ "เป้าหมาย" แบบ empty state
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.flag_outlined,
+                color: theme.colorScheme.primary,
+                size: 28,
               ),
             ),
+            const SizedBox(height: AppSpacing.md),
+            // หัวข้อการ์ด
+            Text("Today's Goal", style: AppTextStyles.cardTitle(context)),
+            const SizedBox(height: AppSpacing.xs),
+            // สถานะ "ยังไม่มีเป้าหมาย"
+            Text('No Goal Yet', style: AppTextStyles.body(context)),
+            const SizedBox(height: AppSpacing.sm),
+            // คำชวนสร้างเป้าหมายแรก
+            Text('Create your first goal', style: AppTextStyles.action(context)),
           ],
         ),
       ),

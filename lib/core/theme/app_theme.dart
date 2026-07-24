@@ -1,37 +1,47 @@
 import 'package:flutter/material.dart';
 
+import 'app_colors.dart';
+import 'app_radius.dart';
+
 /// จุดรวมธีม (theme) ของทั้งแอป StudySprout
 ///
-/// แยกธีมออกมาเป็นไฟล์เดียวเพื่อให้ [StudySproutApp] ใน `app/app.dart`
-/// ดูสะอาดและอ่านง่าย เวลาต้องการปรับสี/ฟอนต์ แก้ที่นี่ที่เดียวพอ
+/// แยกธีมออกมาเป็นไฟล์เดียว เวลาต้องการปรับสี/รัศมี/เงา แก้ที่นี่ที่เดียวพอ
+/// ค่าพื้นฐานทั้งหมดดึงจาก Design System ใน `core/theme/` (app_colors, app_radius)
 class AppTheme {
-  AppTheme._(); // ป้องกันการสร้าง instance — ใช้แค่ static getter ด้านล่าง
+  AppTheme._(); // ป้อกันการสร้าง instance — ใช้แค่ static getter ด้านล่าง
 
   /// ธีมแสง (light theme) แบบ Material 3
   ///
-  /// - [ColorScheme.fromSeed] สร้างชุดสีที่กลมกลืนกันโดยอัตโนมัติจาก "สีเมล็ดพันธุ์" (seedColor)
-  ///   ที่เรากำหนด ที่นี่เลือกสีเขียวเข้ม เพื่อให้รู้สึก "การเติบโต/การเรียนรู้"
-  /// - `useMaterial3: true` เปิดระบบดีไซน์ Material 3 (ค่าเริ่มต้นของ Flutter รุ่นใหม่อยู่แล้ว
-  ///   แต่เขียนไว้ชัดเจนเพื่อให้ผู้เริ่มต้นเข้าใจ)
+  /// - [ColorScheme.fromSeed] สร้างชุดสีที่กลมกลืนกันจาก [AppColors.seed]
+  /// - `useMaterial3: true` เปิดระบบดีไซน์ Material 3
+  /// - ปรับ AppBar, Card, และเงา (shadow) ให้สะอาดตามสไตล์ calm/minimal
   static ThemeData light() {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF2E7D32),
-    );
+    final colorScheme = ColorScheme.fromSeed(seedColor: AppColors.seed);
 
     return ThemeData.light(useMaterial3: true).copyWith(
       colorScheme: colorScheme,
 
-      // ให้ AppBar ใส่/โปร่งใสตามสไตล์ Material 3 (ไม่มีสีพื้นหลังแยก)
+      // พื้นหลังหลักของแอป — ขาวสะอาดตา (calm)
+      scaffoldBackgroundColor: Colors.white,
+
+      // AppBar ใส/โปร่งใสตามสไตล์ Material 3
       appBarTheme: AppBarTheme(
         centerTitle: false,
-        backgroundColor: colorScheme.surface,
+        backgroundColor: Colors.white,
         foregroundColor: colorScheme.onSurface,
         elevation: 0,
         scrolledUnderElevation: 0,
       ),
 
-      // ปรับความกลมของมุมการ์ด/ส่วนโค้งต่าง ๆ ให้นุ่มนวลขึ้นเล็กน้อย
-      cardTheme: const CardThemeData(elevation: 0),
+      // การ์ด: มุมโค้งตาม Design System, ไม่มี elevation (ใช้เงากำหนดเองแทน)
+      cardTheme: CardThemeData(
+        elevation: 0,
+        shape: const RoundedRectangleBorder(
+          borderRadius: AppRadius.card,
+        ),
+        // note: เงาจริงใส่ที่ DecoratedBox ของแต่ละการ์ดใน widget ย่อย
+        // เพื่อควบคุมความนุ่มของเงาได้จากที่เดียว
+      ),
     );
   }
 }
