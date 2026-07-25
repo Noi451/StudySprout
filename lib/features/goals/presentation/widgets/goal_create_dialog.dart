@@ -4,23 +4,33 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../domain/goal.dart';
 import '../../domain/goal_id_generator.dart';
 
-/// Dialog สร้างเป้าหมายใหม่ของ StudySprout
+/// Dialog สร้าง/แก้ไขเป้าหมายของ StudySprout
 ///
 /// ฟอร์มมีสอง field:
 ///  - Title          ชื่อเป้าหมาย (ข้อความ)
 ///  - Target Minutes เป้าหมายเวลาเรียน (ตัวเลขจำนวนเต็ม)
 /// ปุ่ม: Cancel / Save
 ///
-/// เมื่อ Save แล้วจะคืน [Goal] ใหม่กลับไป (หรือ null ถ้ายกเลิก)
+/// รองรับ 2 โหมด:
+///  - **Create** (ไม่ส่ง [existingGoal]) → สร้าง [Goal] ใหม่ คืนกลับไป
+///  - **Edit**   (ส่ง [existingGoal])     → คืน [GoalEditResult] ที่มี id เดิม + ค่าใหม่
+///
 /// ตัว dialog เป็น widget ล้วน ๆ — ส่วนสร้าง id/วันที่อยู่ใน domain layer
 class GoalCreateDialog extends StatefulWidget {
-  const GoalCreateDialog({super.key, required this.existingGoals});
+  const GoalCreateDialog({
+    super.key,
+    required this.existingGoals,
+    this.existingGoal,
+  });
 
-  /// รายการเป้าหมายที่มีอยู่ — ส่งมาเพื่อคำนวณ id ใหม่ไม่ให้ซ้ำ
+  /// รายการเป้าหมายที่มีอยู่ — ส่งมาเพื่อคำนวณ id ใหม่ไม่ให้ซ้ำ (โหมด Create)
   final List<Goal> existingGoals;
 
+  /// เป้าหมายที่จะแก้ไข (โหมด Edit) — null = โหมด Create
+  final Goal? existingGoal;
+
   /// เปิด dialog สร้างเป้าหมาย คืน [Goal] ที่สร้าง หรือ null ถ้ายกเลิก
-  static Future<Goal?> show(
+  static Future<Goal?> showCreate(
     BuildContext context,
     List<Goal> existingGoals,
   ) {
@@ -30,15 +40,48 @@ class GoalCreateDialog extends StatefulWidget {
     );
   }
 
+  /// เปิด dialog แก้ไขเป้าหมาย คืน [GoalEditResult] หรือ null ถ้ายกเลิก
+  static Future<GoalEditResult?> showEdit(
+    BuildContext context,
+    Goal goal,
+  ) {
+    return showDialog<GoalEditResult>(
+      context: context,
+      builder: (context) =>
+          GoalCreateDialog(existingGoals: const [], existingGoal: goal),
+    );
+  }
+
   @override
   State<GoalCreateDialog> createState() => _GoalCreateDialogState();
 }
 
+/// ผลลัพธ์โหมด Edit — เก็บ id เดิม + ค่าใหม่ที่ผู้ใช้กรอก
+class GoalEditResult {
+  const GoalEditResult({required this.id, required this.title, required this.targetMinutes});
+
+  final String id;
+  final String title;
+  final int targetMinutes;
+}
+
 class _GoalCreateDialogState extends State<GoalCreateDialog> {
-  final _titleController = TextEditingController();
-  final _minutesController = TextEditingController();
+  late final TextEditingController _titleController;
+  late final TextEditingController _minutesController;
   String? _titleError;
   String? _minutesError;
+
+  @override
+  void initState() {
+    super.initState();
+    // โหมด Edit → ดึงค่าเดิมมาเติมในฟอร์ม; โหมด Create → ว่าง
+    _titleController = TextEditingController(text: widget.existingGoal?.title ?? '');
+    _minutesController = TextEditingController(
+      text: widget.existingGoal == null
+          ? ''
+          : widget.existingGoal!.targetMinutes.toString(),
+    );
+  }
 
   @override
   void dispose() {
@@ -47,9 +90,9 @@ class _GoalCreateDialogState extends State<GoalCreateDialog> {
     super.dispose();
   }
 
-  /// ตรวจสอบความถูกต้องของ input ก่อนสร้าง Goal
-  /// คืน [Goal] ถ้าผ่าน, หรือ null ถ้า input ไม่สมบูรณ์ (พร้อมตั้งค่า error)
-  Goal? _buildGoalIfValid() {
+  /// ตรวจสอบความถูกต้องของ input — คืนค่าที่ผ่าน หรือตั้ง error ถ้าไม่ผ่าน
+  /// คืน record `(title, minutes)` หรือ null
+  ({String title, int minutes})? _validate() {
     final title = _titleController.text.trim();
     final minutes = int.tryParse(_minutesController.text.trim());
 
@@ -63,7 +106,6 @@ class _GoalCreateDialogState extends State<GoalCreateDialog> {
       minutesError = 'Please enter a valid number';
     }
 
-    // มี error → ตั้งค่าให้ field แสดงข้อความ แล้วคืน null
     if (titleError != null || minutesError != null) {
       setState(() {
         _titleError = titleError;
@@ -72,25 +114,41 @@ class _GoalCreateDialogState extends State<GoalCreateDialog> {
       return null;
     }
 
-    return Goal(
-      id: GoalIdGenerator.nextIdFor(widget.existingGoals),
-      title: title,
-      targetMinutes: minutes!,
-      createdAt: DateTime.now(),
-    );
+    return (title: title, minutes: minutes!);
   }
 
   void _save() {
-    final goal = _buildGoalIfValid();
-    if (goal != null) {
-      Navigator.of(context).pop(goal);
+    final result = _validate();
+    if (result == null) return;
+
+    if (widget.existingGoal != null) {
+      // โหมด Edit → คืน GoalEditResult (id เดิม + ค่าใหม่)
+      Navigator.of(context).pop(
+        GoalEditResult(
+          id: widget.existingGoal!.id,
+          title: result.title,
+          targetMinutes: result.minutes,
+        ),
+      );
+    } else {
+      // โหมด Create → คืน Goal ใหม่
+      Navigator.of(context).pop(
+        Goal(
+          id: GoalIdGenerator.nextIdFor(widget.existingGoals),
+          title: result.title,
+          targetMinutes: result.minutes,
+          createdAt: DateTime.now(),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isEdit = widget.existingGoal != null;
+
     return AlertDialog(
-      title: const Text('Create Goal'),
+      title: Text(isEdit ? 'Edit Goal' : 'Create Goal'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -104,7 +162,6 @@ class _GoalCreateDialogState extends State<GoalCreateDialog> {
                 errorText: _titleError,
               ),
               textCapitalization: TextCapitalization.sentences,
-              // พิมพ์ใหม่ → ล้าง error เดิม
               onChanged: (_) {
                 if (_titleError != null) {
                   setState(() => _titleError = null);
@@ -135,7 +192,7 @@ class _GoalCreateDialogState extends State<GoalCreateDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(onPressed: _save, child: const Text('Save')),
+        FilledButton(onPressed: _save, child: Text(isEdit ? 'Save' : 'Create')),
       ],
     );
   }

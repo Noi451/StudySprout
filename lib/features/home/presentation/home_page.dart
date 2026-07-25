@@ -12,18 +12,18 @@ import 'widgets/xp_card.dart';
 
 /// หน้าหลัก (Home) — แท็บที่ 1
 ///
-/// Milestone 4: ถ้ามีเป้าหมาย → Goal Card แสดงเป้าหมายล่าสุดแทน "No Goal Yet"
-///
-/// ดึงเป้าหมายล่าสุดจาก [GoalStore] กลาง (ส่งผ่าน [GoalStoreProvider])
-/// เมื่อผู้ใช้สร้างเป้าหมายที่ Goals Page หน้านี้จะอัปเดตอัตโนมัติ
+/// Sprint 3: แสดง Active Goal (ไม่ใช่ latestGoal) — ถ้าเปลี่ยน active ที่ Goals Page
+/// หน้านี้อัปเดตอัตโนมัติผ่าน [GoalStoreProvider]/InheritedNotifier
+/// ถ้ายังไม่มีเป้าหมาย → Goal Card แสดง empty state
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // ดึงเป้าหมายล่าสุดจาก store กลาง — rebuild อัตโนมัติเมื่อ store เปลี่ยน
+    // ดึง active goal จาก store กลาง — rebuild อัตโนมัติเมื่อ store เปลี่ยน
+    // (Sprint 3: ใช้ active goal แทน latestGoal)
     final store = GoalStoreProvider.of(context);
-    final latestGoal = store.latestGoal;
+    final activeGoal = store.activeGoal;
 
     return Scaffold(
       // ไม่มี AppBar เพื่อให้หน้าดูสะอาด มีพื้นที่ว่างเยอะตามสไตล์ calm/minimal
@@ -58,13 +58,13 @@ class HomePage extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
 
-              // 4. เป้าหมายของวันนี้ — แสดงเป้าหมายล่าสุด หรือ empty state
-              GoalCard(goal: latestGoal),
+              // 4. เป้าหมายของวันนี้ — แสดง active goal หรือ empty state
+              GoalCard(goal: activeGoal),
 
               const SizedBox(height: AppSpacing.xxl),
 
-              // 5. ปุ่มเริ่มเรียน — disabled ถ้ายังไม่มี Goal
-              StartStudyButton(goal: latestGoal),
+              // 5. ปุ่มเริ่มเรียน — disabled ถ้ายังไม่มี active goal
+              StartStudyButton(goal: activeGoal),
 
               const SizedBox(height: AppSpacing.xxl),
 

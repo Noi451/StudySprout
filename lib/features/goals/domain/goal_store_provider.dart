@@ -6,7 +6,8 @@ import 'goal_store.dart';
 ///
 /// ใช้ [InheritedNotifier] ที่รองรับการ rebuild อัตโนมัติเมื่อ [GoalStore]
 /// (ซึ่งเป็น [ChangeNotifier]) แจ้งว่ามีการเปลี่ยนแปลง — ทำให้ widget ที่
-/// ดึง store ผ่าน [GoalStoreProvider.of] ถูก rebuild เมื่อรายการเป้าหมายเปลี่ยน
+/// ดึง store ผ่าน [GoalStoreProvider.of] ถูก rebuild เมื่อรายการเป้าหมายหรือ
+/// active goal เปลี่ยน (สร้าง/แก้/ลบ/เปลี่ยน active)
 ///
 /// วิธีนี้ไม่ต้องใช้ state management library (Provider/Riverpod/Bloc)
 /// และไม่ต้องแก้ router — เพียงหุ้ม MaterialApp.router ด้วย widget นี้
