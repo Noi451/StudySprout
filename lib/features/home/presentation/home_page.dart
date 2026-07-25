@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_spacing.dart';
 import '../../goals/domain/goal_store_provider.dart';
+import 'widgets/active_session_card.dart';
 import 'widgets/goal_card.dart';
 import 'widgets/start_study_button.dart';
 import 'widgets/streak_card.dart';
@@ -62,8 +63,13 @@ class HomePage extends StatelessWidget {
 
               const SizedBox(height: AppSpacing.xxl),
 
-              // 5. ปุ่มเริ่มเรียน
-              const StartStudyButton(),
+              // 5. ปุ่มเริ่มเรียน — disabled ถ้ายังไม่มี Goal
+              StartStudyButton(goal: latestGoal),
+
+              const SizedBox(height: AppSpacing.xxl),
+
+              // 6. สถานะ session ที่กำลังเรียนอยู่ (ถ้ามี) — แตะเพื่อกลับเข้า Timer ต่อ
+              const ActiveSessionCard(),
             ],
           ),
         ),
