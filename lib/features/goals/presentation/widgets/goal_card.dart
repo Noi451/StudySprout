@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/format/duration_formatter.dart';
 import '../../domain/goal.dart';
 
 /// การ์ดแสดงรายการเป้าหมายหนึ่งรายการใน Goals Page
@@ -101,7 +102,7 @@ class GoalCard extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    '${goal.targetMinutes} min',
+                    DurationFormatter.fromMinutes(goal.targetMinutes),
                     style: AppTextStyles.body(context),
                   ),
                 ],

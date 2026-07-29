@@ -3,21 +3,34 @@ import 'goal.dart';
 /// ตัวสร้างรหัสเฉพาะ (id) สำหรับ [Goal]
 ///
 /// แยก logic การสร้าง id ออกจาก widget เพื่อให้โค้ดสะอาดและเปลี่ยนที่เดียวได้
-/// ตอนนี้ใช้ [DateTime.timestamp] อัตโนมัติ (จะ throw ในบางสภาพแวดล้อมเช่น test runner
-/// จึงคืนค่า String แทนเพื่อให้ง่ายและคาดเดาได้)
+///
+/// ⚠️ ใช้ค่าสูงสุดของเลข id ที่มีอยู่ + 1 (ไม่ใช่จำนวน goal) เพื่อให้ **id ไม่มีทางซ้ำกัน**
+/// แม้จะลบ goal ไปแล้วสร้างใหม่ — เช่น มี goal_1, goal_3 อยู่ ตัวใหม่จะเป็น goal_4
+/// (วิธีเดิมนับจากจำนวน → ลบแล้วสร้างใหม่ทำให้ id ซ้ำ → เป็นสาเหตุของบัค
+/// "active goal สองตัว" เพราะมี goal 2 ตัว id เดียวกันใน list)
 class GoalIdGenerator {
   GoalIdGenerator._(); // ป้องกันการสร้าง instance
 
-  /// สร้าง id จากตัวนับอัตโนมัติ — ใช้ร่วมกับรายการเพื่อให้ id ไม่ซ้ำกัน
+  /// สร้าง id จากเลข id ที่สูงที่สุดใน [existing] บวก 1
   ///
-  /// รับค่า count = จำนวนเป้าหมายที่มีอยู่ แล้วคืน id ถัดไป
-  /// วิธีนี้เรียบง่ายและไม่พึ่งพา [DateTime.now] (ซึ่งอาจไม่สามารถใช้ได้ในบาง context)
-  static String nextId(int currentCount) {
-    return 'goal_${currentCount + 1}';
+  /// ไม่ใช้ [DateTime.now] เพื่อให้ id คาดเดาได้และทดสอบง่าย
+  /// ถ้ายังไม่มี goal เลย → คืน `goal_1`
+  static String nextIdFor(List<Goal> existing) {
+    var max = 0;
+    for (final goal in existing) {
+      final n = _parseNumber(goal.id);
+      if (n > max) max = n;
+    }
+    return 'goal_${max + 1}';
   }
 
-  /// คืน id ถัดไปสำหรับรายการที่มีอยู่ [existing]
-  static String nextIdFor(List<Goal> existing) {
-    return nextId(existing.length);
+  /// แยกตัวเลขต่อท้าย id ออกมา — `goal_7` → 7, `goal_1` → 1, อื่น ๆ → 0
+  /// ใช้เพื่อหาค่าสูงสุด ไม่ใช่เพื่อตรวจรูปแบบ จึงหละโลยเมื่อ parse ไม่ได้
+  static int _parseNumber(String id) {
+    final match = _idPattern.firstMatch(id);
+    if (match == null) return 0;
+    return int.tryParse(match.group(1)!) ?? 0;
   }
+
+  static final _idPattern = RegExp(r'goal_(\d+)$');
 }

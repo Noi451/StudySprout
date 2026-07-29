@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/format/duration_formatter.dart';
 import '../../../goals/domain/goal.dart';
 
 /// การ์ด "เป้าหมายของวันนี้" ของหน้า Home
@@ -80,7 +81,7 @@ class GoalCard extends StatelessWidget {
                   Text(goal!.title, style: AppTextStyles.cardTitle(context)),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    '${goal!.targetMinutes} min',
+                    DurationFormatter.fromMinutes(goal!.targetMinutes),
                     style: AppTextStyles.body(context),
                   ),
                 ],

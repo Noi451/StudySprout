@@ -35,42 +35,59 @@ class HomePage extends StatelessWidget {
             AppSpacing.xl,
             AppSpacing.xxl,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. ข้อความต้อนรับ
-              const WelcomeSection(),
-              const SizedBox(height: AppSpacing.sm),
+          // Sprint 6: ใช้ LayoutBuilder + SingleChildScrollView + IntrinsicHeight
+          // (canonical "fill space, scroll if needed" pattern) — เมื่อจอสูงพอ ทุกอย่าง
+          // พอดีและ TreeSection ยืดเต็มที่เหลือ; เมื่อจอเล็กเกินไปจะเลื่อนได้แทนการล้น
+          // ทะลุ (กัน RenderFlex overflow โดยไม่ใช้ ClipRect ซ่อน)
+          // IntrinsicHeight ทำให้ Column ได้ bounded height → Expanded ใช้ได้
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
+                  ),
+                  child: IntrinsicHeight(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 1. ข้อความต้อนรับ
+                        const WelcomeSection(),
+                        const SizedBox(height: AppSpacing.sm),
 
-              // 2. ต้นไม้กึ่งกลาง — กินพื้นที่ว่างที่เหลือ (ยืดหยุ่นตามจอ ไม่ล้น)
-              const Expanded(child: TreeSection()),
+                        // 2. ต้นไม้กึ่งกลาง — กินพื้นที่ว่างที่เหลือ (ยืดหยุ่นตามจอ ไม่ล้น)
+                        const Expanded(child: TreeSection()),
 
-              // 3. XP + Streak วางคู่กัน 2 คอลัมน์
-              const IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(child: XpCard()),
-                    SizedBox(width: AppSpacing.md),
-                    Expanded(child: StreakCard()),
-                  ],
+                      // 3. XP + Streak วางคู่กัน 2 คอลัมน์
+                      // Sprint 6: ลบ IntrinsicHeight + stretch (เคยบังคับให้การ์ดสูงเท่ากัน →
+                      // กินพื้นที่คงที่มากจน Column overflow 16px) ใช้ start แทน การ์ดสูงตามเนื้อหา
+                      const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: XpCard()),
+                          SizedBox(width: AppSpacing.md),
+                          Expanded(child: StreakCard()),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+
+                      // 4. เป้าหมายของวันนี้ — แสดง active goal หรือ empty state
+                      GoalCard(goal: activeGoal),
+
+                      const SizedBox(height: AppSpacing.xxl),
+
+                      // 5. ปุ่มเริ่มเรียน — disabled ถ้ายังไม่มี active goal
+                      StartStudyButton(goal: activeGoal),
+
+                      const SizedBox(height: AppSpacing.xxl),
+
+                      // 6. สถานะ session ที่กำลังเรียนอยู่ (ถ้ามี) — แตะเพื่อกลับเข้า Timer ต่อ
+                      const ActiveSessionCard(),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // 4. เป้าหมายของวันนี้ — แสดง active goal หรือ empty state
-              GoalCard(goal: activeGoal),
-
-              const SizedBox(height: AppSpacing.xxl),
-
-              // 5. ปุ่มเริ่มเรียน — disabled ถ้ายังไม่มี active goal
-              StartStudyButton(goal: activeGoal),
-
-              const SizedBox(height: AppSpacing.xxl),
-
-              // 6. สถานะ session ที่กำลังเรียนอยู่ (ถ้ามี) — แตะเพื่อกลับเข้า Timer ต่อ
-              const ActiveSessionCard(),
-            ],
+              );
+            },
           ),
         ),
       ),

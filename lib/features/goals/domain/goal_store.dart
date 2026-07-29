@@ -45,7 +45,11 @@ class GoalStore extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   /// เพิ่มเป้าหมายใหม่ แล้วแจ้ง listener + บันทึก
+  ///
+  /// กัน duplicate id เผื่อกรณี id generator ซ้ำ (ไม่ควรเกิดหลังแก้ generator)
+  /// — ถ้ามี id นี้อยู่แล้วจะไม่เพิ่ม เพื่อรักษา invariant "id ไม่ซ้ำใน list"
   void add(Goal goal) {
+    if (_goals.any((g) => g.id == goal.id)) return;
     _goals.add(goal);
     _persist();
     notifyListeners();
@@ -133,9 +137,14 @@ class GoalStore extends ChangeNotifier {
     final goalsJson = prefs.getString(goalsKey);
     if (goalsJson != null) {
       final list = jsonDecode(goalsJson) as List;
+      final parsed =
+          list.map((e) => Goal.fromJson(e as Map<String, Object?>)).toList();
+      // กันข้อมูลเดิมที่อาจมี id ซ้ำ (บัค pre-fix): เก็บเฉพาะตัวแรกของแต่ละ id
+      // เพื่อรักษา invariant "id ไม่ซ้ำใน list"
+      final seen = <String>{};
       _goals
         ..clear()
-        ..addAll(list.map((e) => Goal.fromJson(e as Map<String, Object?>)));
+        ..addAll(parsed.where((g) => seen.add(g.id)));
     }
 
     _activeGoalId = prefs.getString(activeKey);
@@ -143,6 +152,13 @@ class GoalStore extends ChangeNotifier {
     if (_activeGoalId != null &&
         _goals.indexWhere((g) => g.id == _activeGoalId) == -1) {
       _activeGoalId = null;
+    }
+
+    // ถ้ามี goals แต่ยังไม่มี active (เช่นข้อมูลเก่าหรือ active id หาย) →
+    // ตั้งตัวแรกเป็น active เพื่อรักษา invariant "มี goal แล้วต้องมี active"
+    if (_activeGoalId == null && _goals.isNotEmpty) {
+      _activeGoalId = _goals.first.id;
+      await _persist(); // บันทึก active ที่ได้รับการแก้ให้ตรงกับกฎ
     }
 
     notifyListeners();
