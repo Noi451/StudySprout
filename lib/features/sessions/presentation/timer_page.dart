@@ -1,28 +1,28 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/responsive/breakpoints.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_motion.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/app_press_button.dart';
+import '../../../core/widgets/status_pill.dart';
 import '../../../core/format/duration_formatter.dart';
 import '../../progress/domain/progress_store_provider.dart';
 import '../domain/finish_session_service.dart';
 import '../domain/session_status.dart';
 import '../domain/session_store_provider.dart';
 import 'session_format.dart';
+import 'widgets/early_finish_dialog.dart';
 import 'widgets/session_finish_dialog.dart';
 
-/// หน้า Timer ของ Session การเรียน
+/// หน้า Timer ของ Session การเรียน (Midnight Greenhouse redesign)
 ///
-/// ดึงสถานะจาก [SessionStore] กลาง (ส่งผ่าน [SessionStoreProvider]) —
-/// ทุกวินาที store จะ `notifyListeners()` ทำให้หน้านี้ rebuild และเวลาอัปเดตอัตโนมัติ
+/// เวลาเป็น focal point; goal title = supporting; circular progress = emerald/sky;
+/// Pause = subtle, Finish = danger/subtle (ไม่เด่นเท่า Primary ยกเว้นครบเป้า → primary)
 ///
-/// Sprint 5.1 — Finish Flow Hardening:
-///  - เปลี่ยนเป็น StatefulWidget (กรณีจำเป็นจริง ๆ) เพื่อมี transient guard flag
-///  - **commit ก่อนเปิด dialog** ผ่าน [FinishSessionService.commit] (exactly once)
-///  - dialog เป็น presentation only — Done แค่ปิด ไม่ trigger การบันทึก
-///  - `_isFinishing` guard ป้องกันกด Finish รัว ๆ / re-entry / dialog ซ้อน
-///
-/// Flow: Running (นับขึ้น) ↔ Paused → Finish → commit → Finish Dialog → กลับ Home
+/// Business logic (Finish flow / Early Finish / commit) ไม่เปลี่ยนเลย
 class TimerPage extends StatefulWidget {
   const TimerPage({super.key});
 
@@ -31,40 +31,32 @@ class TimerPage extends StatefulWidget {
 }
 
 class _TimerPageState extends State<TimerPage> {
-  /// guard กันกด Finish รัว ๆ และ re-entry ขณะกำลัง commit/แสดง dialog
   bool _isFinishing = false;
 
-  Future<void> _finish(BuildContext context) async {
-    // ป้องกัน re-entry — ถ้ากำลัง finish อยู่แล้ว ไม่ทำซ้ำ
+  Future<void> _finish() async {
     if (_isFinishing) return;
-    setState(() => _isFinishing = true);
 
     final sessionStore = SessionStoreProvider.of(context);
     final progressStore = ProgressStoreProvider.of(context);
-    // จับ Navigator ไว้ก่อน await (context ที่ส่งเข้ามาอาจ stale หลัง async gap)
     final navigator = Navigator.of(context);
 
-    // commit ก่อนเปิด dialog — exactly once (synchronous, atomic)
-    // บันทึก history + แจก XP แล้วคืน snapshot ผลลัพธ์ (null = ไม่มี active session)
-    final result = const FinishSessionService().commit(
-      sessionStore,
-      progressStore,
-    );
+    if (!sessionStore.isGoalReached) {
+      final confirmed = await EarlyFinishDialog.show(context);
+      if (!mounted) return;
+      if (!confirmed) return;
+    }
 
-    // หยุดที่นี่ถ้า widget ถูก dispose ระหว่าง commit
+    setState(() => _isFinishing = true);
+
+    final result = const FinishSessionService().commit(sessionStore, progressStore);
+
     if (!mounted) return;
-
-    // ไม่มี active session → ไม่มีอะไรจะแสดง → pop กลับ
     if (result == null) {
       navigator.pop();
       return;
     }
 
-    // แสดง dialog สรุปผล — presentation only (อ่านจาก snapshot)
-    // ปิดด้วยวิธีใดก็ตาม (Done/Back/Escape/กดนอก) ข้อมูล commit ไปแล้ว
     await SessionFinishDialog.show(context, result);
-
-    // ปิด dialog แล้ว → pop กลับ Home (เช็ก mounted หลัง await)
     if (!mounted) return;
     navigator.pop();
   }
@@ -73,7 +65,6 @@ class _TimerPageState extends State<TimerPage> {
   Widget build(BuildContext context) {
     final store = SessionStoreProvider.of(context);
 
-    // กรณีไม่มี session active (แปลก ๆ) → แสดง empty + ปุ่มกลับ
     if (store.current == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Study Session')),
@@ -95,77 +86,69 @@ class _TimerPageState extends State<TimerPage> {
 
     final session = store.current!;
     final isRunning = session.status == SessionStatus.running;
+    final reached = store.isGoalReached;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(session.goalTitle),
-        // ปุ่มย้อนกลับ → กลับ Home โดย session ยัง active อยู่ใน store
-        // (Home จะแสดง ActiveSessionCard ให้กลับเข้ามาต่อได้)
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back',
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xxl),
-          child: Column(
-            children: [
-              const Spacer(),
-              // วงแหวนความคืบหน้า + ตัวเลขเวลาตรงกลาง
-              _TimerRing(
-                progress: store.progress,
-                timeText: SessionFormat.duration(store.elapsedSeconds),
-              ),
-              const SizedBox(height: AppSpacing.xxl),
-              // ป้ายสถานะ
-              Text(
-                isRunning ? 'Running' : 'Paused',
-                style: AppTextStyles.label(context),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              // เป้าหมายของรอบนี้
-              Text(
-                'Goal: ${DurationFormatter.fromMinutes(session.targetMinutes)}',
-                style: AppTextStyles.body(context),
-              ),
-              const Spacer(),
-              // ปุ่ม Pause/Resume (toggle ตามสถานะ)
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: isRunning
-                      ? () => store.pause()
-                      : () => store.resume(),
-                  style: OutlinedButton.styleFrom(
-                    shape: const RoundedRectangleBorder(
-                      borderRadius: AppRadius.button,
+        child: ResponsivePageFrame(
+          child: Center(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: AppSpacing.xxl,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // focal: time ring
+                    _TimerRing(
+                      progress: store.progress,
+                      timeText: SessionFormat.duration(store.elapsedSeconds),
+                      reached: reached,
+                      reduceMotion: reduceMotion,
                     ),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: AppSpacing.lg,
+                    const SizedBox(height: AppSpacing.xxl),
+                    // status pill
+                    StatusPill(
+                      label: isRunning ? 'Running' : 'Paused',
+                      accent: isRunning ? AppColors.emerald : AppColors.amber,
+                      icon: isRunning ? Icons.play_arrow : Icons.pause,
                     ),
-                  ),
-                  child: Text(isRunning ? 'Pause' : 'Resume'),
+                    const SizedBox(height: AppSpacing.sm),
+                    // supporting: goal target
+                    Text(
+                      'Goal: ${DurationFormatter.fromMinutes(session.targetMinutes)}',
+                      style: AppTextStyles.body(context),
+                    ),
+                    const SizedBox(height: AppSpacing.xxxl),
+                    // pause = subtle
+                    _PauseResumeButton(
+                      isRunning: isRunning,
+                      onPause: store.pause,
+                      onResume: store.resume,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    // finish: danger/subtle (ครบเป้า → primary เด่น)
+                    AppPressButton(
+                      label: 'Finish',
+                      onPressed: _isFinishing ? null : _finish,
+                      variant: reached ? AppButtonVariant.primary : AppButtonVariant.subtle,
+                      icon: Icons.check,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: AppSpacing.md),
-              // ปุ่ม Finish — disabled ขณะกำลัง finish (กันกดซ้ำ)
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _isFinishing ? null : () => _finish(context),
-                  style: FilledButton.styleFrom(
-                    shape: const RoundedRectangleBorder(
-                      borderRadius: AppRadius.button,
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: AppSpacing.lg,
-                    ),
-                  ),
-                  child: const Text('Finish'),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -173,40 +156,119 @@ class _TimerPageState extends State<TimerPage> {
   }
 }
 
-/// วงแหวนความคืบหน้าพร้อมตัวเลขเวลา (mm:ss) อยู่ตรงกลาง
-class _TimerRing extends StatelessWidget {
-  const _TimerRing({required this.progress, required this.timeText});
+/// ปุ่ม Pause/Resume — subtle (surface) เปลี่ยนสี animated
+class _PauseResumeButton extends StatelessWidget {
+  const _PauseResumeButton({
+    required this.isRunning,
+    required this.onPause,
+    required this.onResume,
+  });
 
-  final double progress;
-  final String timeText;
+  final bool isRunning;
+  final VoidCallback onPause;
+  final VoidCallback onResume;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    return SizedBox(
+      width: double.infinity,
+      child: AnimatedContainer(
+        duration: AppMotion.medium,
+        curve: AppMotion.easeOutCubic,
+        decoration: BoxDecoration(
+          color: isRunning ? AppColors.surfaceHigh : AppColors.emeraldContainer,
+          borderRadius: AppRadius.button,
+          border: Border.all(
+            color: isRunning ? AppColors.outlineSoft : AppColors.emerald.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: AppRadius.button,
+            onTap: isRunning ? onPause : onResume,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+              child: Center(
+                child: AnimatedSwitcher(
+                  duration: AppMotion.short,
+                  transitionBuilder: (child, animation) =>
+                      FadeTransition(opacity: animation, child: child),
+                  child: Text(
+                    isRunning ? 'Pause' : 'Resume',
+                    key: ValueKey(isRunning),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: isRunning ? AppColors.textPrimary : AppColors.emerald,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// วงแหวนเวลา — focal point; emerald ring, sky เมื่อครบเป้า
+class _TimerRing extends StatelessWidget {
+  const _TimerRing({
+    required this.progress,
+    required this.timeText,
+    required this.reached,
+    required this.reduceMotion,
+  });
+
+  final double progress;
+  final String timeText;
+  final bool reached;
+  final bool reduceMotion;
+
+  @override
+  Widget build(BuildContext context) {
+    final ringColor = reached ? AppColors.sky : AppColors.emerald;
 
     return SizedBox(
-      width: 260,
-      height: 260,
+      width: 280,
+      height: 280,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // วงแหวน progress (determinate — ค่าจาก store.progress 0.0–1.0)
           SizedBox(
-            width: 260,
-            height: 260,
+            width: 280,
+            height: 280,
             child: CircularProgressIndicator(
               value: progress,
-              strokeWidth: 12,
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
-              color: theme.colorScheme.primary,
+              strokeWidth: 14,
+              backgroundColor: AppColors.surfaceHighest,
+              color: ringColor,
+              strokeCap: StrokeCap.round,
             ),
           ),
-          // ตัวเลขเวลาเด่นตรงกลาง
-          Text(
-            timeText,
-            style: theme.textTheme.displaySmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              fontFeatures: const [FontFeature.tabularFigures()],
+          AnimatedSwitcher(
+            duration: reduceMotion ? Duration.zero : AppMotion.short,
+            transitionBuilder: (child, animation) {
+              if (reduceMotion) return child;
+              return FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.90, end: 1.00).animate(animation),
+                  child: child,
+                ),
+              );
+            },
+            child: Text(
+              timeText,
+              key: ValueKey(timeText),
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w800,
+                fontSize: 52,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ),
         ],

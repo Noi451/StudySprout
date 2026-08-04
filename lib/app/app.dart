@@ -50,8 +50,8 @@ class StudySproutApp extends StatelessWidget {
             title: 'StudySprout',
             debugShowCheckedModeBanner: false,
 
-            // ธีมแสงที่สะอาดตา แบบ Material 3
-            theme: AppTheme.light(),
+            // ธีม Midnight Greenhouse (Dark-first) — Material 3
+            theme: AppTheme.dark(),
 
             // ส่ง router ให้ MaterialApp จัดการเส้นทางทั้งหมด
             routerConfig: AppRouter.router,

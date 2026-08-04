@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/format/duration_formatter.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/app_surface.dart';
 import '../../../sessions/domain/session_record.dart';
 
-/// แถวรายการ session หนึ่งรายการในส่วน "Recent Sessions" ของหน้า Progress
-///
-/// แสดง: ไอคอน + ชื่อ Goal + วันที่ (เริ่ม) + เวลาที่เรียน (ผ่าน formatter กลาง)
-///
-/// เป็น UI ล้วน ๆ — รับ [SessionRecord] มาแสดงเท่านั้น ไม่มี business logic
+/// แถวรายการ session หนึ่งรายการในส่วน "Recent Sessions" (Midnight Greenhouse)
 class RecentSessionTile extends StatelessWidget {
   const RecentSessionTile({super.key, required this.record});
 
@@ -17,57 +16,75 @@ class RecentSessionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-      child: Row(
-        children: [
-          // ไอคอนในวงกลมเขียวโปร่ง
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.timer_outlined,
-              color: theme.colorScheme.primary,
-              size: 20,
-            ),
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: AppSurface(
+        level: AppSurfaceLevel.base,
+        radius: BorderRadius.circular(AppRadius.md),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.md,
           ),
-          const SizedBox(width: AppSpacing.md),
-          // ชื่อ Goal + วันที่
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  record.goalTitle,
-                  style: AppTextStyles.cardTitle(context),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.emerald.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  _formatDate(record.startedAt),
-                  style: AppTextStyles.body(context),
+                child: const Icon(
+                  Icons.timer_outlined,
+                  color: AppColors.emerald,
+                  size: 20,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      record.goalTitle,
+                      style: AppTextStyles.cardTitle(context),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      _formatDate(record.startedAt),
+                      style: AppTextStyles.caption(context),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.xs,
+                ),
+                decoration: BoxDecoration(
+                  color: (record.completed ? AppColors.emerald : AppColors.amber)
+                      .withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  DurationFormatter.fromSeconds(record.elapsedSeconds),
+                  style: AppTextStyles.metricLabel(context).copyWith(
+                    color: record.completed ? AppColors.emerald : AppColors.amber,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           ),
-          // เวลาที่เรียน (formatter กลาง)
-          Text(
-            DurationFormatter.fromSeconds(record.elapsedSeconds),
-            style: AppTextStyles.value(context),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  /// จัดรูปแบบวันที่แบบสั้น เช่น "Jul 29, 2026"
   static String _formatDate(DateTime dt) {
     const months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',

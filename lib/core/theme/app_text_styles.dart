@@ -1,72 +1,120 @@
 import 'package:flutter/material.dart';
 
-/// ชุดสไตล์ตัวอักษร (text styles) ของ Design System StudySprout
+import 'app_colors.dart';
+
+/// Type hierarchy ของ StudySprout (Midnight Greenhouse)
 ///
-/// เป็นชุดสไตล์ที่สอดคล้องกับ Material 3 typography แต่กำหนด weight/ความหนา
-/// ให้ชัดเจนและสอดคล้องกันทั่วแอป แทนการเขียนซ้ำในแต่ละ widget
+/// Sprint 8: สร้าง ladder ที่ชัด — แต่ละระดับต่างกันที่ size/weight/color
+/// หลีกเลี่ยงตัวหนาทุกบรรทัด / font size ใกล้กัน / สีขาวเท่ากันทุกระดับ
 ///
-/// การใช้งาน: ส่งผ่าน `Theme.of(context)` เป็นฐาน แล้ว override ด้วยค่าจากที่นี่
-/// ```
-/// Text('StudySprout', style: AppTextStyles.brand(context))
-/// ```
+/// Ladder (สูง → ต่ำ):
+///  - [display]      Hero/Display (StudySprout, Growth Hero) — ใหญ่สุด
+///  - [brand]        ชื่อแบรนด์ (เดิมเก็กไว้) ≈ display เล็กกว่าเล็กน้อย
+///  - [pageTitle]    หัวข้อหน้า (AppBar)
+///  - [sectionTitle] หัวข้อ section
+///  - [cardTitle]    หัวข้อการ์ด
+///  - [metricValue]  ตัวเลข metric — เด่น ตัวเลข
+///  - [metricLabel]  ป้าย metric — สั้น สีอ่อน
+///  - [greeting]     คำทักทาย — textSecondary
+///  - [body]         ข้อความปกติ — textSecondary
+///  - [bodyStrong]   ข้อความสำคัญ — textPrimary หนา
+///  - [label]        ป้ายบนการ์ด — textSecondary
+///  - [action]       ข้อความชวนกระทำ — emerald
+///  - [caption]      metadata จาง ๆ — textMuted
+///  - [value]        (compat) ค่าตัวเลขบนการ์ด ≈ metricValue
+///  - [button]       ข้อความปุ่ม — onPrimary หนา
+///
+/// ทุก style กำหนดสีตรง ๆ จาก [AppColors] (ไม่พึ่ง textTheme color) เพื่อ contrast
+/// ที่ควบคุมได้ และรองรับ text scaling โดยไม่ overflow (ไม่กำหนดความสูงตายตัว)
 class AppTextStyles {
-  AppTextStyles._(); // ป้องกันการสร้าง instance
+  AppTextStyles._();
 
-  /// ชื่อแบรนด์ "StudySprout" — ตัวใหญ่ เด่น หนา
-  static TextStyle brand(BuildContext context) {
-    return Theme.of(context).textTheme.headlineMedium!.copyWith(
-          fontWeight: FontWeight.bold,
-        );
-  }
+  static TextStyle display(BuildContext context) =>
+      Theme.of(context).textTheme.displayMedium!.copyWith(
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+            height: 1.1,
+            letterSpacing: -0.5,
+          );
 
-  /// คำทักทาย (เช่น "Good Morning") — กลาง สีอ่อนกว่าปกติ
-  static TextStyle greeting(BuildContext context) {
-    return Theme.of(context).textTheme.titleMedium!.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        );
-  }
+  static TextStyle brand(BuildContext context) =>
+      Theme.of(context).textTheme.headlineMedium!.copyWith(
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+            letterSpacing: -0.3,
+          );
 
-  /// ป้ายขนาดเล็กบนการ์ด (เช่น "Level 1", "Current Streak") — สีอ่อน
-  static TextStyle label(BuildContext context) {
-    return Theme.of(context).textTheme.labelLarge!.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        );
-  }
+  static TextStyle pageTitle(BuildContext context) =>
+      Theme.of(context).textTheme.titleLarge!.copyWith(
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          );
 
-  /// ค่าตัวเลข/ข้อความสำคัญบนการ์ด (เช่น "XP 0 / 100", "0 Days") — หนา เด่น
-  static TextStyle value(BuildContext context) {
-    return Theme.of(context).textTheme.titleMedium!.copyWith(
-          fontWeight: FontWeight.bold,
-        );
-  }
+  static TextStyle sectionTitle(BuildContext context) =>
+      Theme.of(context).textTheme.titleMedium!.copyWith(
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          );
 
-  /// หัวข้อการ์ด (เช่น "Today's Goal") — หนา
-  static TextStyle cardTitle(BuildContext context) {
-    return Theme.of(context).textTheme.titleMedium!.copyWith(
-          fontWeight: FontWeight.bold,
-        );
-  }
+  static TextStyle cardTitle(BuildContext context) =>
+      Theme.of(context).textTheme.titleMedium!.copyWith(
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          );
 
-  /// ข้อความบอกรายละเอียด/สถานะว่าง — สีอ่อน ขนาดปกติ
-  static TextStyle body(BuildContext context) {
-    return Theme.of(context).textTheme.bodyMedium!.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        );
-  }
+  static TextStyle metricValue(BuildContext context) =>
+      Theme.of(context).textTheme.titleLarge!.copyWith(
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          );
 
-  /// ข้อความชวนสร้าง/คลิก (เช่น "Create your first goal") — สีหลัก หนา
-  static TextStyle action(BuildContext context) {
-    return Theme.of(context).textTheme.bodySmall!.copyWith(
-          color: Theme.of(context).colorScheme.primary,
-          fontWeight: FontWeight.w600,
-        );
-  }
+  static TextStyle metricLabel(BuildContext context) =>
+      Theme.of(context).textTheme.labelMedium!.copyWith(
+            color: AppColors.textMuted,
+            fontWeight: FontWeight.w600,
+          );
 
-  /// ข้อความบนปุ่มใหญ่ (CTA) — ขนาดกลาง หนา สีตัดกับพื้นปุ่ม
-  static TextStyle button(BuildContext context) {
-    return Theme.of(context).textTheme.titleMedium!.copyWith(
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.onPrimary,
+  static TextStyle greeting(BuildContext context) =>
+      Theme.of(context).textTheme.bodyMedium!.copyWith(
+            color: AppColors.textMuted,
+          );
+
+  static TextStyle body(BuildContext context) =>
+      Theme.of(context).textTheme.bodyMedium!.copyWith(
+            color: AppColors.textSecondary,
+          );
+
+  static TextStyle bodyStrong(BuildContext context) =>
+      Theme.of(context).textTheme.bodyMedium!.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          );
+
+  static TextStyle label(BuildContext context) =>
+      Theme.of(context).textTheme.labelLarge!.copyWith(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          );
+
+  static TextStyle action(BuildContext context) =>
+      Theme.of(context).textTheme.bodySmall!.copyWith(
+            color: AppColors.emerald,
+            fontWeight: FontWeight.w700,
+          );
+
+  static TextStyle caption(BuildContext context) =>
+      Theme.of(context).textTheme.bodySmall!.copyWith(
+            color: AppColors.textMuted,
         );
-  }
+
+  /// (compat) ค่าตัวเลขบนการ์ดเดิม — ใช้ metricValue
+  static TextStyle value(BuildContext context) => metricValue(context);
+
+  /// ข้อความปุ่ม — onPrimary หนา
+  static TextStyle button(BuildContext context) =>
+      Theme.of(context).textTheme.titleMedium!.copyWith(
+            fontWeight: FontWeight.bold,
+            color: AppColors.onEmerald,
+          );
 }

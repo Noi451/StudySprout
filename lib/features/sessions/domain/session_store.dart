@@ -62,6 +62,18 @@ class SessionStore extends ChangeNotifier {
     return ratio.clamp(0.0, 1.0);
   }
 
+  /// ถึงเป้าหมายของรอบนี้หรือยัง — `elapsedSeconds >= targetMinutes * 60`
+  ///
+  /// Sprint 6: ใช้ตัดสินใจใน [TimerPage] ว่ากด Finish แล้วจะต้องถามยืนยันก่อน
+  /// (ยังไม่ครบ → Early Finish confirmation) หรือจบได้เลย (ครบแล้ว → flow Sprint 5.1)
+  ///
+  /// เป็น business logic ใน domain layer — widget แค่อ่านค่านี้ ไม่คำนวณเอง
+  /// ถ้าไม่มี session หรือ targetMinutes เป็น 0 → คืน false
+  bool get isGoalReached {
+    if (_current == null || _current!.targetMinutes <= 0) return false;
+    return _current!.elapsedSeconds >= _current!.targetMinutes * 60;
+  }
+
   /// เริ่ม session การเรียนใหม่จาก [goal]
   ///
   /// สร้าง [StudySession] สถานะ [SessionStatus.running], `elapsedSeconds = 0`,

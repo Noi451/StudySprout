@@ -7,8 +7,6 @@
 //  - ProgressStats (Sprint 4)
 //  - XP/Level/TreeStage calculators + ProgressStore (Sprint 5)
 
-import 'dart:ui' show Size;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,6 +27,10 @@ import 'package:studysprout_app/features/sessions/domain/session_record.dart';
 import 'package:studysprout_app/features/sessions/domain/session_status.dart';
 import 'package:studysprout_app/features/sessions/domain/session_store.dart';
 import 'package:studysprout_app/features/sessions/domain/study_session.dart';
+import 'package:studysprout_app/features/goals/domain/goal_store_provider.dart';
+import 'package:studysprout_app/features/sessions/domain/session_store_provider.dart';
+import 'package:studysprout_app/features/progress/domain/progress_store_provider.dart';
+import 'package:studysprout_app/features/sessions/presentation/timer_page.dart';
 
 void main() {
   // SharedPreferences เป็น plugin — ต้อง mock ก่อนใช้ใน unit test
@@ -53,6 +55,71 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.byType(StudySproutApp), findsOneWidget);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Sprint 8 — Responsive smoke tests (ไม่ใช้ package)
+  // ตรวจ layout ที่ 3 ขนาด + text scaling โดยไม่ RenderFlex overflow
+  // ---------------------------------------------------------------------------
+  Future<void> pumpApp(WidgetTester tester, Size size) async {
+    await tester.binding.setSurfaceSize(size);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+  }
+
+  testWidgets('Sprint 8: Compact 390x844 — Home build ไม่ overflow', (tester) async {
+    await pumpApp(tester, const Size(390, 844));
+    await tester.pumpWidget(
+      StudySproutApp(
+        goalStore: GoalStore(),
+        sessionStore: SessionStore(),
+        progressStore: ProgressStore(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(StudySproutApp), findsOneWidget);
+  });
+
+  testWidgets('Sprint 8: Medium 768x1024 — Home build ไม่ overflow', (tester) async {
+    await pumpApp(tester, const Size(768, 1024));
+    await tester.pumpWidget(
+      StudySproutApp(
+        goalStore: GoalStore(),
+        sessionStore: SessionStore(),
+        progressStore: ProgressStore(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(StudySproutApp), findsOneWidget);
+  });
+
+  testWidgets('Sprint 8: Expanded 1440x900 — Home build + NavigationRail', (tester) async {
+    await pumpApp(tester, const Size(1440, 900));
+    await tester.pumpWidget(
+      StudySproutApp(
+        goalStore: GoalStore(),
+        sessionStore: SessionStore(),
+        progressStore: ProgressStore(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // Expanded → NavigationRail แทน bottom nav
+    expect(find.byType(NavigationRail), findsOneWidget);
+  });
+
+  testWidgets('Sprint 8: text scale 1.6 — Home build ไม่ overflow', (tester) async {
+    await pumpApp(tester, const Size(390, 1200));
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+        child: StudySproutApp(
+          goalStore: GoalStore(),
+          sessionStore: SessionStore(),
+          progressStore: ProgressStore(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
     expect(find.byType(StudySproutApp), findsOneWidget);
   });
 
@@ -572,6 +639,30 @@ void main() {
       expect(store.elapsedSeconds, 60);
       expect(store.progress, 1.0);
       expect(store.status, SessionStatus.paused);
+    });
+
+    test('isGoalReached false ขณะยังไม่ครบเป้า (Sprint 6)', () {
+      final store = SessionStore();
+      store.startSession(goal); // target 60 วินาที
+      store.tick(); // 1 วินาที
+
+      expect(store.isGoalReached, isFalse);
+    });
+
+    test('isGoalReached true เมื่อครบเป้า (Sprint 6)', () {
+      final store = SessionStore();
+      store.startSession(goal); // target 60 วินาที
+      for (var i = 0; i < 60; i++) {
+        store.tick();
+      } // ครบ 60
+
+      expect(store.isGoalReached, isTrue);
+    });
+
+    test('isGoalReached false เมื่อไม่มี session (Sprint 6)', () {
+      final store = SessionStore(); // ว่าง
+
+      expect(store.isGoalReached, isFalse);
     });
 
     test('pause แล้ว tick ไม่เพิ่มเวลา', () {
@@ -1143,6 +1234,138 @@ void main() {
       expect(result.xpGained, 0);
       expect(result.resultingTotalXp, 0);
       expect(result.didLevelUp, isFalse);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Sprint 6 — Early Finish confirmation (TimerPage flow)
+  // ---------------------------------------------------------------------------
+
+  group('TimerPage — Early Finish (Sprint 6)', () {
+    final goal = Goal(
+      id: 'goal_1',
+      title: 'Math',
+      targetMinutes: 1, // 60 วินาที
+      createdAt: DateTime(2026, 7, 29),
+    );
+
+    /// สร้าง widget tree ที่มี Provider ครบเหมือนในแอป + เปิด TimerPage เป็น home
+    Widget buildHarness(SessionStore sessionStore, ProgressStore progressStore) {
+      return GoalStoreProvider(
+        notifier: GoalStore(),
+        child: SessionStoreProvider(
+          notifier: sessionStore,
+          child: ProgressStoreProvider(
+            notifier: progressStore,
+            child: MaterialApp(
+              home: TimerPage(key: Key('timer_page')),
+            ),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('ยังไม่ครบเป้า → กด Finish ขึ้น EarlyFinishDialog', (tester) async {
+      final sessionStore = SessionStore();
+      final progressStore = ProgressStore();
+      // startSession เริ่ม Timer.periodic จริง → ต้อง dispose ปิด ticker ภายใน test
+      // (dispose ใน body ไม่ใช่ addTearDown เพราะ binding ตรวจ "Timer pending" ก่อน tearDown)
+      sessionStore.startSession(goal);
+      sessionStore.tick(); // 1 วินาที (ยังไม่ครบ 60)
+
+      await tester.pumpWidget(buildHarness(sessionStore, progressStore));
+      await tester.pumpAndSettle();
+
+      // กด Finish
+      await tester.tap(find.text('Finish'));
+      await tester.pumpAndSettle();
+
+      // ต้องขึ้น dialog ยืนยัน (ไม่ใช่ dialog สรุปผล)
+      expect(find.text('Are you sure?'), findsOneWidget);
+      expect(find.text("You haven't reached your study goal yet."), findsOneWidget);
+      expect(find.text('Continue Studying'), findsOneWidget);
+      expect(find.text('Finish Anyway'), findsOneWidget);
+      // ยังไม่ commit → ไม่มี history, ไม่มี XP
+      expect(sessionStore.history, isEmpty);
+      expect(progressStore.totalXp, 0);
+
+      sessionStore.dispose(); // ปิด ticker ก่อนตรวจ pending timer
+    });
+
+    testWidgets('เลือก Continue Studying → ปิด dialog, session ยัง active, ไม่ commit',
+        (tester) async {
+      final sessionStore = SessionStore();
+      final progressStore = ProgressStore();
+      sessionStore.startSession(goal);
+      sessionStore.tick();
+
+      await tester.pumpWidget(buildHarness(sessionStore, progressStore));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Finish'));
+      await tester.pumpAndSettle();
+
+      // Continue Studying
+      await tester.tap(find.text('Continue Studying'));
+      await tester.pumpAndSettle();
+
+      // dialog ยืนยันปิดแล้ว และไม่มี dialog สรุปผล
+      expect(find.text('Are you sure?'), findsNothing);
+      expect(find.text('Study Complete'), findsNothing);
+      // session ยัง active — ไม่ได้ commit
+      expect(sessionStore.isActive, isTrue);
+      expect(sessionStore.history, isEmpty);
+      expect(progressStore.totalXp, 0);
+
+      sessionStore.dispose();
+    });
+
+    testWidgets('เลือก Finish Anyway → commit + ขึ้น dialog สรุปผล', (tester) async {
+      final sessionStore = SessionStore();
+      final progressStore = ProgressStore();
+      sessionStore.startSession(goal);
+      sessionStore.tick(); // 1 วินาที = 1 XP (round จาก 1s → 0 นาที... ดู XpCalculator)
+
+      await tester.pumpWidget(buildHarness(sessionStore, progressStore));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Finish'));
+      await tester.pumpAndSettle();
+
+      // Finish Anyway → commit
+      await tester.tap(find.text('Finish Anyway'));
+      await tester.pumpAndSettle();
+
+      // ขึ้น dialog สรุปผล
+      expect(find.text('Study Complete'), findsOneWidget);
+      // commit แล้ว → history 1, current เป็น null
+      expect(sessionStore.history.length, 1);
+      expect(sessionStore.isActive, isFalse);
+
+      sessionStore.dispose();
+    });
+
+    testWidgets('ครบเป้าแล้ว → กด Finish ไม่ถาม ขึ้น dialog สรุปผลเลย', (tester) async {
+      final sessionStore = SessionStore();
+      final progressStore = ProgressStore();
+      sessionStore.startSession(goal);
+      for (var i = 0; i < 60; i++) {
+        sessionStore.tick();
+      } // ครบ 60 วินาที (เป้า) → isGoalReached = true
+      expect(sessionStore.isGoalReached, isTrue);
+
+      await tester.pumpWidget(buildHarness(sessionStore, progressStore));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Finish'));
+      await tester.pumpAndSettle();
+
+      // ห้ามถามยืนยัน — ขึ้น dialog สรุปผลโดยตรง
+      expect(find.text('Are you sure?'), findsNothing);
+      expect(find.text('Study Complete'), findsOneWidget);
+      expect(sessionStore.history.length, 1);
+
+      sessionStore.dispose();
     });
   });
 

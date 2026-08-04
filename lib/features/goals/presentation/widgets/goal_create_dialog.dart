@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/app_press_button.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../domain/goal.dart';
 import '../../domain/goal_id_generator.dart';
@@ -192,8 +193,15 @@ class _GoalCreateDialogState extends State<GoalCreateDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(onPressed: _save, child: Text(isEdit ? 'Save' : 'Create')),
+        // PART 6 — ปุ่ม Save/Create ใช้ AppPressButton (ripple + elevation ตอน press)
+        // แบบไม่ขยายเต็มหน้า (isExpanded: false) เหมาะกับ action bar ของ Dialog
+        AppPressButton(
+          label: isEdit ? 'Save' : 'Create',
+          onPressed: _save,
+          isExpanded: false,
+        ),
       ],
     );
   }
 }
+

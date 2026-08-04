@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/widgets/app_nav_shell.dart';
+import '../core/widgets/animated_bottom_nav.dart';
 import '../features/goals/presentation/goals_page.dart';
 import '../features/home/presentation/home_page.dart';
 import '../features/profile/presentation/profile_page.dart';
@@ -28,40 +30,39 @@ class AppRouter {
         builder: (context, state, navigationShell) {
           // navigationShell คือตัวที่คุมการสลับแท็บ
           // เราหุ้มด้วย Scaffold + NavigationBar (Bottom Navigation แบบ Material 3)
-          return Scaffold(
+          return AppNavShell(
+            currentIndex: navigationShell.currentIndex,
+            onSelect: (index) {
+              // สลับไปแท็บที่เลือก พร้อมเก็บ state ของแท็บเดิมไว้
+              // (routing logic: paths/branches/goBranch ไม่ถูกแตะเลย)
+              navigationShell.goBranch(
+                index,
+                initialLocation: index == navigationShell.currentIndex,
+              );
+            },
             body: navigationShell,
-            bottomNavigationBar: NavigationBar(
-              selectedIndex: navigationShell.currentIndex,
-              onDestinationSelected: (index) {
-                // สลับไปแท็บที่เลือก พร้อมเก็บ state ของแท็บเดิมไว้
-                navigationShell.goBranch(
-                  index,
-                  initialLocation: index == navigationShell.currentIndex,
-                );
-              },
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home),
-                  label: 'Home',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.flag_outlined),
-                  selectedIcon: Icon(Icons.flag),
-                  label: 'Goals',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.trending_up_outlined),
-                  selectedIcon: Icon(Icons.trending_up),
-                  label: 'Progress',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.person_outline),
-                  selectedIcon: Icon(Icons.person),
-                  label: 'Profile',
-                ),
-              ],
-            ),
+            destinations: const [
+              AnimatedNavDestination(
+                icon: Icons.home_outlined,
+                selectedIcon: Icons.home,
+                label: 'Home',
+              ),
+              AnimatedNavDestination(
+                icon: Icons.flag_outlined,
+                selectedIcon: Icons.flag,
+                label: 'Goals',
+              ),
+              AnimatedNavDestination(
+                icon: Icons.trending_up_outlined,
+                selectedIcon: Icons.trending_up,
+                label: 'Progress',
+              ),
+              AnimatedNavDestination(
+                icon: Icons.person_outline,
+                selectedIcon: Icons.person,
+                label: 'Profile',
+              ),
+            ],
           );
         },
         branches: [

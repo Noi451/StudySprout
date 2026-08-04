@@ -1,34 +1,26 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/responsive/breakpoints.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/empty_state_panel.dart';
+import '../../../../core/widgets/app_press_button.dart';
 import '../domain/goal_store_provider.dart';
 import 'widgets/goal_card.dart';
 import 'widgets/goal_create_dialog.dart';
-import 'widgets/goals_empty_state.dart';
 
 /// หน้าเป้าหมาย (Goals) — แท็บที่ 2
 ///
-/// Sprint 3: เป็นระบบ CRUD ใช้งานจริง
-///  - สร้างเป้าหมาย (FAB / empty state button)
-///  - แก้ไขเป้าหมาย (เมนู Edit ในการ์ด)
-///  - ลบเป้าหมาย (เมนู Delete ในการ์ด + dialog ยืนยัน)
-///  - ตั้ง Active Goal (เมนู Set Active ในการ์ด)
-///
-/// ดึงข้อมูลจาก [GoalStore] กลาง (ส่งผ่าน [GoalStoreProvider]) —
-/// ทุกการเปลี่ยนแปลงจะอัปเดตหน้า Home ด้วยผ่าน InheritedNotifier
+/// Sprint 3: ระบบ CRUD ใช้งานจริง
+/// Sprint 8: ใช้ Product Identity ใหม่ (Midnight Greenhouse) + responsive frame
 class GoalsPage extends StatelessWidget {
   const GoalsPage({super.key});
 
-  /// เปิด dialog สร้างเป้าหมาย แล้วเพิ่มเข้า [GoalStore]
   Future<void> _openCreateGoalDialog(BuildContext context) async {
     final store = GoalStoreProvider.of(context);
     final goal = await GoalCreateDialog.showCreate(context, store.goals);
-    if (goal != null) {
-      store.add(goal);
-    }
+    if (goal != null) store.add(goal);
   }
 
-  /// เปิด dialog แก้ไขเป้าหมาย แล้วอัปเดตใน [GoalStore]
   Future<void> _openEditGoalDialog(BuildContext context, String id) async {
     final store = GoalStoreProvider.of(context);
     final goal = store.goals.firstWhere((g) => g.id == id);
@@ -42,9 +34,8 @@ class GoalsPage extends StatelessWidget {
     }
   }
 
-  /// ยืนยันลบเป้าหมาย แล้วลบจาก [GoalStore]
   Future<void> _confirmDelete(BuildContext context, String id) async {
-    final store = GoalStoreProvider.of(context); // ดึง store ก่อน await
+    final store = GoalStoreProvider.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -65,9 +56,7 @@ class GoalsPage extends StatelessWidget {
         ],
       ),
     );
-    if (confirmed == true) {
-      store.deleteGoal(id);
-    }
+    if (confirmed == true) store.deleteGoal(id);
   }
 
   @override
@@ -80,26 +69,46 @@ class GoalsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Goals')),
       body: isEmpty
-          ? GoalsEmptyState(onCreate: () => _openCreateGoalDialog(context))
-          : ListView.builder(
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              itemCount: goals.length,
-              itemBuilder: (context, index) {
-                final goal = goals[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                  child: GoalCard(
-                    goal: goal,
-                    isActive: goal.id == activeId,
-                    onSetActive: () => store.setActiveGoal(goal.id),
-                    onEdit: () => _openEditGoalDialog(context, goal.id),
-                    onDelete: () => _confirmDelete(context, goal.id),
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.xxl),
+                child: EmptyStatePanel(
+                  icon: Icons.flag_outlined,
+                  title: 'No Goals Yet',
+                  caption: 'Create your first goal to start your study journey.',
+                  action: AppPressButton(
+                    label: 'Create Goal',
+                    onPressed: () => _openCreateGoalDialog(context),
+                    isExpanded: false,
+                    icon: Icons.add,
                   ),
-                );
-              },
+                ),
+              ),
+            )
+          : SafeArea(
+              child: ResponsivePageFrame(
+                child: ListView.builder(
+                  padding: const EdgeInsets.only(
+                    top: AppSpacing.xl,
+                    bottom: AppSpacing.xxxl,
+                  ),
+                  itemCount: goals.length,
+                  itemBuilder: (context, index) {
+                    final goal = goals[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                      child: GoalCard(
+                        goal: goal,
+                        isActive: goal.id == activeId,
+                        onSetActive: () => store.setActiveGoal(goal.id),
+                        onEdit: () => _openEditGoalDialog(context, goal.id),
+                        onDelete: () => _confirmDelete(context, goal.id),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
-      // ปุ่มลอยสร้างเป้าหมาย — แสดงเฉพาะเมื่อมีเป้าหมายแล้ว
-      // (empty state มีปุ่ม Create Goal ของตัวเองอยู่แล้ว)
       floatingActionButton: isEmpty
           ? null
           : FloatingActionButton(
