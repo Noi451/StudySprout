@@ -19,10 +19,12 @@ import 'growth_illustration.dart';
 /// C. Growth Hero Card — หัวใจของ Home
 ///
 /// รวม hierarchy: tree illustration + stage name + active goal + progress + CTA
-///  - Compact: tree บน / goal+CTA ล่าง (single column)
-///  - Expanded: tree ขวา / goal+stage+progress+CTA ซ้าย (2/3 + 1/3)
+///  - Compact (Sprint 8.1): single-column, padding กระชับ, ไม่ซ้อน card;
+///    ลำดับ StageHeader → Illustration → Goal/Progress → CTA
+///  - Expanded: tree ขวา / goal+stage+progress+CTA ซ้าย (2/3 + 1/3) — คงเดิม
 ///
-/// Empty goal → แสดง empty state ที่ซื่อสัตย์ + ปุ่ม Create Goal (ไม่ใช่ CTA Start)
+/// Empty goal → compact แสดง EmptyStatePanel ในตัว (ไม่ซ้อนการ์ด);
+/// expanded ใช้ AppSurface แยกตาม desktop baseline
 class GrowthHeroCard extends StatelessWidget {
   const GrowthHeroCard({
     super.key,
@@ -51,28 +53,33 @@ class GrowthHeroCard extends StatelessWidget {
       level: AppSurfaceLevel.base,
       radius: AppRadius.hero,
       elevated: true,
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xxl),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final expanded = AppBreakpoint.isExpanded(constraints.maxWidth);
-            if (expanded) return _expanded(context, reduceMotion);
-            return _compact(context, reduceMotion);
-          },
-        ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final expanded = AppBreakpoint.isExpanded(constraints.maxWidth);
+          // Sprint 8.1: compact ใช้ padding กระชับกว่า (lg) เพื่อความรู้สึก mobile-first
+          // expanded คง xxl ตาม desktop baseline
+          final padding = expanded ? AppSpacing.xxl : AppSpacing.lg;
+          return Padding(
+            padding: EdgeInsets.all(padding),
+            child: expanded
+                ? _expanded(context, reduceMotion)
+                : _compact(context, reduceMotion),
+          );
+        },
       ),
     );
   }
 
-  // --- Compact: tree บน / goal+CTA ล่าง ---
+  // --- Compact: StageHeader → Illustration → Goal+CTA (single column) ---
   Widget _compact(BuildContext context, bool reduceMotion) {
     return Column(
       children: [
+        _StageHeader(stage: stage, compact: true),
+        const SizedBox(height: AppSpacing.md),
         Center(
-          child: _Illustration(stage: stage, size: 180, reduceMotion: reduceMotion),
+          // 170 — อยู่ในช่วง 130–180, กลางการ์ดอย่าง intentional (halo circle)
+          child: _Illustration(stage: stage, size: 170, reduceMotion: reduceMotion),
         ),
-        const SizedBox(height: AppSpacing.lg),
-        _StageHeader(stage: stage),
         const SizedBox(height: AppSpacing.lg),
         _GoalAndCta(
           goal: goal,
@@ -87,12 +94,11 @@ class GrowthHeroCard extends StatelessWidget {
     );
   }
 
-  // --- Expanded: tree ขวา / goal+CTA ซ้าย ---
+  // --- Expanded: tree ขวา / goal+CTA ซ้าย (คงเดิม) ---
   Widget _expanded(BuildContext context, bool reduceMotion) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // ซ้าย: stage + goal + progress + CTA (≈ 1.4fr)
         Expanded(
           flex: 14,
           child: Column(
@@ -113,7 +119,6 @@ class GrowthHeroCard extends StatelessWidget {
           ),
         ),
         const SizedBox(width: AppSpacing.xxl),
-        // ขวา: illustration (≈ 1fr)
         Expanded(
           flex: 10,
           child: Center(
@@ -125,12 +130,15 @@ class GrowthHeroCard extends StatelessWidget {
   }
 }
 
-/// ส่วนหัวของ Hero — stage name + pill + ข้อความการเติบโต
+/// ส่วนหัวของ Hero — stage pill + stage name + ข้อความการเติบโต
+///
+/// [compact] = true → ใช้ display ที่เล็กลง (displaySmall) เพื่อไม่ใหญ่เกินมือถือ
 class _StageHeader extends StatelessWidget {
-  const _StageHeader({required this.stage, this.alignStart = false});
+  const _StageHeader({required this.stage, this.alignStart = false, this.compact = false});
 
   final TreeStage stage;
   final bool alignStart;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -145,7 +153,12 @@ class _StageHeader extends StatelessWidget {
           icon: Icons.park,
         ),
         const SizedBox(height: AppSpacing.sm),
-        Text(stage.label, style: AppTextStyles.display(context)),
+        Text(
+          stage.label,
+          style: compact
+              ? AppTextStyles.display(context).copyWith(fontSize: 24)
+              : AppTextStyles.display(context),
+        ),
         const SizedBox(height: AppSpacing.xs),
         Text(
           _growthMessage(stage),
@@ -200,6 +213,9 @@ class _Illustration extends StatelessWidget {
 }
 
 /// ส่วน goal + progress + CTA (มี/ไม่มี goal)
+///
+/// [compact] = true → empty state แสดงในตัว (EmptyStatePanel compact + CTA เต็มกว้าง)
+/// ไม่ซ้อน AppSurface อีกชั้น (กัน "card ซ้อน card" บนมือถือ)
 class _GoalAndCta extends StatelessWidget {
   const _GoalAndCta({
     required this.goal,
@@ -221,8 +237,28 @@ class _GoalAndCta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ไม่มี goal → empty state + ปุ่ม Create Goal
+    // ไม่มี goal → empty state
     if (goal == null) {
+      // compact: แสดงในตัว ไม่ซ้อนการ์ด — CTA เต็มกว้าง (thumb-friendly)
+      if (compact) {
+        return Column(
+          children: [
+            EmptyStatePanel(
+              icon: Icons.flag_outlined,
+              title: 'No Active Goal',
+              caption: 'Create a goal to start growing your tree.',
+              compact: true,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            AppPressButton(
+              label: 'Create Goal',
+              onPressed: onCreateGoal,
+              icon: Icons.add,
+            ),
+          ],
+        );
+      }
+      // expanded: คง AppSurface แยกตาม desktop baseline
       return AppSurface(
         level: AppSurfaceLevel.high,
         radius: BorderRadius.circular(AppRadius.lg),
@@ -291,7 +327,7 @@ class _GoalAndCta extends StatelessWidget {
           showGlow: true,
         ),
         const SizedBox(height: AppSpacing.xxl),
-        // CTA
+        // CTA — primary เดียว เต็มกว้าง (thumb-friendly)
         AppPressButton(
           label: 'Start Study',
           onPressed: onStartStudy,

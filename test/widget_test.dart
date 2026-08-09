@@ -31,6 +31,7 @@ import 'package:studysprout_app/features/goals/domain/goal_store_provider.dart';
 import 'package:studysprout_app/features/sessions/domain/session_store_provider.dart';
 import 'package:studysprout_app/features/progress/domain/progress_store_provider.dart';
 import 'package:studysprout_app/features/sessions/presentation/timer_page.dart';
+import 'package:studysprout_app/core/widgets/animated_bottom_nav.dart';
 
 void main() {
   // SharedPreferences เป็น plugin — ต้อง mock ก่อนใช้ใน unit test
@@ -59,67 +60,84 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // Sprint 8 — Responsive smoke tests (ไม่ใช้ package)
-  // ตรวจ layout ที่ 3 ขนาด + text scaling โดยไม่ RenderFlex overflow
+  // Sprint 8 / 8.1 — Responsive smoke tests (ไม่ใช้ package)
+  // ตรวจ layout หลายขนาด + text scaling โดยไม่ RenderFlex overflow
   // ---------------------------------------------------------------------------
   Future<void> pumpApp(WidgetTester tester, Size size) async {
     await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
   }
 
-  testWidgets('Sprint 8: Compact 390x844 — Home build ไม่ overflow', (tester) async {
+  Widget buildApp() => StudySproutApp(
+        goalStore: GoalStore(),
+        sessionStore: SessionStore(),
+        progressStore: ProgressStore(),
+      );
+
+  testWidgets('Sprint 8.1: Compact 390x844 — BottomNav แสดง, Rail ไม่แสดง, Home render',
+      (tester) async {
     await pumpApp(tester, const Size(390, 844));
-    await tester.pumpWidget(
-      StudySproutApp(
-        goalStore: GoalStore(),
-        sessionStore: SessionStore(),
-        progressStore: ProgressStore(),
-      ),
-    );
+    await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
+    expect(find.byType(AnimatedBottomNav), findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
     expect(find.byType(StudySproutApp), findsOneWidget);
   });
 
-  testWidgets('Sprint 8: Medium 768x1024 — Home build ไม่ overflow', (tester) async {
+  testWidgets('Sprint 8.1: Compact 412x915 — BottomNav แสดง, Rail ไม่แสดง, Home render',
+      (tester) async {
+    await pumpApp(tester, const Size(412, 915));
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    expect(find.byType(AnimatedBottomNav), findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
+    expect(find.byType(StudySproutApp), findsOneWidget);
+  });
+
+  testWidgets('Sprint 8.1: Compact — สลับทุกแท็บ render ไม่ overflow (390x844)',
+      (tester) async {
+    await pumpApp(tester, const Size(390, 844));
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    // Home (เริ่มต้น) ผ่าน → แตะแต่ละแท็บแล้ว pump ไม่ overflow
+    for (final label in ['Goals', 'Progress', 'Profile', 'Home']) {
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+    }
+    expect(find.byType(StudySproutApp), findsOneWidget);
+  });
+
+  testWidgets('Sprint 8.1: Medium 768x1024 — Home build ไม่ overflow', (tester) async {
     await pumpApp(tester, const Size(768, 1024));
-    await tester.pumpWidget(
-      StudySproutApp(
-        goalStore: GoalStore(),
-        sessionStore: SessionStore(),
-        progressStore: ProgressStore(),
-      ),
-    );
+    await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     expect(find.byType(StudySproutApp), findsOneWidget);
   });
 
-  testWidgets('Sprint 8: Expanded 1440x900 — Home build + NavigationRail', (tester) async {
+  testWidgets('Sprint 8.1: Expanded 1440x900 — NavigationRail (desktop regression)',
+      (tester) async {
     await pumpApp(tester, const Size(1440, 900));
-    await tester.pumpWidget(
-      StudySproutApp(
-        goalStore: GoalStore(),
-        sessionStore: SessionStore(),
-        progressStore: ProgressStore(),
-      ),
-    );
+    await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
-    // Expanded → NavigationRail แทน bottom nav
+    // Expanded → NavigationRail ยังอยู่ (desktop baseline คงเดิม)
     expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(AnimatedBottomNav), findsNothing);
   });
 
-  testWidgets('Sprint 8: text scale 1.6 — Home build ไม่ overflow', (tester) async {
-    await pumpApp(tester, const Size(390, 1200));
+  testWidgets('Sprint 8.1: text scale 1.6 — สลับทุกแท็บไม่ overflow (390x844)',
+      (tester) async {
+    await pumpApp(tester, const Size(390, 1600));
     await tester.pumpWidget(
       MediaQuery(
         data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
-        child: StudySproutApp(
-          goalStore: GoalStore(),
-          sessionStore: SessionStore(),
-          progressStore: ProgressStore(),
-        ),
+        child: buildApp(),
       ),
     );
     await tester.pumpAndSettle();
+    for (final label in ['Goals', 'Progress', 'Profile', 'Home']) {
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+    }
     expect(find.byType(StudySproutApp), findsOneWidget);
   });
 

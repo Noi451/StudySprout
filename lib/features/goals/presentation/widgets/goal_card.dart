@@ -113,7 +113,9 @@ class _GoalMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<_GoalAction>(
+      // Sprint 8.1: padding 12 รอบ icon 24 → touch target 48×48 (mobile)
       icon: const Icon(Icons.more_vert, color: AppColors.textMuted),
+      padding: const EdgeInsets.all(12),
       tooltip: 'Goal options',
       onSelected: (action) {
         switch (action) {

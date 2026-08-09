@@ -220,18 +220,24 @@ class _StaggerRevealState extends State<_StaggerReveal> {
 }
 
 /// Empty state — ซื่อสัตย์
+/// Sprint 8.1: จัดให้อยู่ช่วงบน/กลางที่สมเหตุผล ไม่ลอยกลางพื้นที่ว่างมหาศาล
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xxl),
-        child: EmptyStatePanel(
-          icon: Icons.insights_outlined,
-          title: 'No Study Sessions Yet',
-          caption: 'Finish a study session to see your progress here.',
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xxl,
+          vertical: AppSpacing.xxxl * 3,
+        ),
+        child: Center(
+          child: EmptyStatePanel(
+            icon: Icons.insights_outlined,
+            title: 'No Study Sessions Yet',
+            caption: 'Finish a study session to see your progress here.',
+          ),
         ),
       ),
     );

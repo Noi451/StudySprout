@@ -10,9 +10,8 @@ import '../../../../core/widgets/section_header.dart';
 
 /// หน้าโปรไฟล์ (Profile) — แท็บที่ 4
 ///
-/// Sprint 8: ยังไม่มีข้อมูลจริง (ไม่มี avatar/name/settings store) →
-/// ทำ foundation screen ที่ polished แต่ซื่อสัตย์ — ระบุว่าส่วนต่าง ๆ "Coming later"
-/// ห้ามสร้าง avatar/name/settings ปลอม (ตามกฎ)
+/// Sprint 8: foundation screen ซื่อสัตย์ (Coming Later) — ห้ามสร้าง avatar/name/settings ปลอม
+/// Sprint 8.1: compact ลด padding/logo และ Coming Later tiles ให้กระชับ mobile-first
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
@@ -29,32 +28,7 @@ class ProfilePage extends StatelessWidget {
             ),
             children: [
               // ส่วนบน: โลโก้แบรนด์ + สถานะ foundation
-              AppSurface(
-                level: AppSurfaceLevel.base,
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.xxl),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          color: AppColors.emerald,
-                          borderRadius: BorderRadius.circular(AppRadius.xl),
-                        ),
-                        child: const Icon(Icons.park, color: AppColors.onEmerald, size: 40),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      Text('StudySprout', style: AppTextStyles.brand(context)),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'Your study companion',
-                        style: AppTextStyles.body(context),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              _ProfileHero(),
               const SizedBox(height: AppSpacing.xxl),
               const SectionHeader(title: 'Coming Later'),
               ..._comingLater.map((item) => _ComingLaterTile(item: item)),
@@ -85,6 +59,45 @@ class ProfilePage extends StatelessWidget {
   ];
 }
 
+/// Profile hero — compact ลด padding + logo เล็กลง; expanded คงขนาด desktop
+class _ProfileHero extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = AppBreakpoint.isCompact(constraints.maxWidth);
+        final padding = compact ? AppSpacing.xl : AppSpacing.xxl;
+        final logoSize = compact ? 56.0 : 72.0;
+        final logoIcon = compact ? 32.0 : 40.0;
+
+        return AppSurface(
+          level: AppSurfaceLevel.base,
+          child: Padding(
+            padding: EdgeInsets.all(padding),
+            child: Column(
+              children: [
+                Container(
+                  width: logoSize,
+                  height: logoSize,
+                  decoration: BoxDecoration(
+                    color: AppColors.emerald,
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                  ),
+                  child: Icon(Icons.park, color: AppColors.onEmerald, size: logoIcon),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text('StudySprout', style: AppTextStyles.brand(context)),
+                const SizedBox(height: AppSpacing.xs),
+                Text('Your study companion', style: AppTextStyles.body(context)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _ComingItem {
   const _ComingItem({
     required this.icon,
@@ -96,48 +109,56 @@ class _ComingItem {
   final String caption;
 }
 
+/// Coming Later row — compact กระชับ padding; description wrap ได้ ห้าม overflow
 class _ComingLaterTile extends StatelessWidget {
   const _ComingLaterTile({required this.item});
   final _ComingItem item;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: AppSurface(
-        level: AppSurfaceLevel.high,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Row(
-            children: [
-              Icon(item.icon, color: AppColors.emerald, size: 24),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(item.title, style: AppTextStyles.cardTitle(context)),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(item.caption, style: AppTextStyles.body(context)),
-                  ],
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = AppBreakpoint.isCompact(constraints.maxWidth);
+        final padding = compact ? AppSpacing.md : AppSpacing.lg;
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          child: AppSurface(
+            level: AppSurfaceLevel.high,
+            child: Padding(
+              padding: EdgeInsets.all(padding),
+              child: Row(
+                children: [
+                  Icon(item.icon, color: AppColors.emerald, size: 24),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.title, style: AppTextStyles.cardTitle(context)),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(item.caption, style: AppTextStyles.body(context)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.xs,
+                    ),
+                    decoration: const BoxDecoration(
+                      color: AppColors.outlineSoft,
+                      borderRadius: AppRadius.pill,
+                    ),
+                    child: Text('Soon', style: AppTextStyles.caption(context)),
+                  ),
+                ],
               ),
-              const SizedBox(width: AppSpacing.md),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.xs,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.outlineSoft,
-                  borderRadius: AppRadius.pill,
-                ),
-                child: Text('Soon', style: AppTextStyles.caption(context)),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

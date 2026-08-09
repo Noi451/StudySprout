@@ -69,18 +69,24 @@ class GoalsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Goals')),
       body: isEmpty
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.xxl),
-                child: EmptyStatePanel(
-                  icon: Icons.flag_outlined,
-                  title: 'No Goals Yet',
-                  caption: 'Create your first goal to start your study journey.',
-                  action: AppPressButton(
-                    label: 'Create Goal',
-                    onPressed: () => _openCreateGoalDialog(context),
-                    isExpanded: false,
-                    icon: Icons.add,
+          // Sprint 8.1: empty state อยู่ช่วงบน/กลางที่สมเหตุผล ไม่ลอยกลางพื้นที่ว่างมหาศาล
+          // ใช้ SingleChildScrollView + top spacing จาก spacing tokens (xxxl×3 = 96)
+          ? SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xxl,
+                  vertical: AppSpacing.xxxl * 3,
+                ),
+                child: Center(
+                  child: EmptyStatePanel(
+                    icon: Icons.flag_outlined,
+                    title: 'No Goals Yet',
+                    caption: 'Create your first goal to start your study journey.',
+                    action: AppPressButton(
+                      label: 'Create Goal',
+                      onPressed: () => _openCreateGoalDialog(context),
+                      icon: Icons.add,
+                    ),
                   ),
                 ),
               ),
