@@ -7,6 +7,8 @@
 //  - ProgressStats (Sprint 4)
 //  - XP/Level/TreeStage calculators + ProgressStore (Sprint 5)
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -32,6 +34,14 @@ import 'package:studysprout_app/features/sessions/domain/session_store_provider.
 import 'package:studysprout_app/features/progress/domain/progress_store_provider.dart';
 import 'package:studysprout_app/features/sessions/presentation/timer_page.dart';
 import 'package:studysprout_app/core/widgets/animated_bottom_nav.dart';
+import 'package:studysprout_app/features/evidence/domain/verification_result.dart';
+import 'package:studysprout_app/features/evidence/domain/evidence_verifier.dart';
+import 'package:studysprout_app/features/evidence/domain/evidence_verification_status.dart';
+import 'package:studysprout_app/features/evidence/domain/evidence_verification_store.dart';
+import 'package:studysprout_app/features/evidence/presentation/evidence_verification_screen.dart';
+import 'package:studysprout_app/features/evidence/presentation/evidence_verification_page.dart';
+import 'package:studysprout_app/features/evidence/domain/evidence_verification_store_provider.dart';
+import 'package:studysprout_app/core/widgets/app_press_button.dart';
 
 void main() {
   // SharedPreferences เป็น plugin — ต้อง mock ก่อนใช้ใน unit test
@@ -1404,4 +1414,480 @@ void main() {
       expect(DurationFormatter.fromSeconds(5400), '1 hr 30 min');
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Sprint 9A — AI Evidence Verification Foundation
+  // Domain: VerificationResult + EvidenceVerificationStore
+  // (ไม่ยิง network จริง — ใช้ FakeEvidenceVerifier / ThrowingVerifier)
+  // ---------------------------------------------------------------------------
+
+  group('VerificationResult', () {
+    test('เก็บค่า passed/confidence/reason ได้ถูกต้อง', () {
+      const r = VerificationResult(
+        passed: true,
+        confidence: 0.87,
+        reason: 'looks related',
+      );
+      expect(r.passed, isTrue);
+      expect(r.confidence, 0.87);
+      expect(r.reason, 'looks related');
+    });
+
+    test('confidence เกิน 1.0 → clamp ที่ 1.0', () {
+      const r = VerificationResult(passed: true, confidence: 5, reason: 'x');
+      expect(r.confidence, 1.0);
+    });
+
+    test('confidence ต่ำกว่า 0 → clamp ที่ 0.0', () {
+      const r = VerificationResult(passed: false, confidence: -3, reason: 'x');
+      expect(r.confidence, 0.0);
+    });
+
+    test('confidence ที่ขอบ 0.0 และ 1.0 → ไม่เปลี่ยน', () {
+      const a = VerificationResult(passed: true, confidence: 0.0, reason: 'x');
+      const b = VerificationResult(passed: true, confidence: 1.0, reason: 'x');
+      expect(a.confidence, 0.0);
+      expect(b.confidence, 1.0);
+    });
+  });
+
+  group('EvidenceVerificationStore', () {
+    test('เริ่มต้น idle, ไม่มี evidence, ไม่มี result', () {
+      final store = EvidenceVerificationStore(
+        verifier: _FakeVerifier(const VerificationResult(
+          passed: true, confidence: 1, reason: 'ok',
+        )),
+      );
+      addTearDown(store.dispose);
+
+      expect(store.status, EvidenceVerificationStatus.idle);
+      expect(store.hasEvidence, isFalse);
+      expect(store.isVerifying, isFalse);
+      expect(store.result, isNull);
+    });
+
+    test('setEvidence → hasEvidence true + status idle', () {
+      final store = EvidenceVerificationStore(
+        verifier: _FakeVerifier(VerificationResult.accepted),
+      );
+      addTearDown(store.dispose);
+
+      store.setEvidence([1, 2, 3]);
+
+      expect(store.hasEvidence, isTrue);
+      expect(store.status, EvidenceVerificationStatus.idle);
+    });
+
+    test('verify โดยไม่มี evidence → no-op (ยัง idle)', () async {
+      final store = EvidenceVerificationStore(
+        verifier: _FakeVerifier(VerificationResult.accepted),
+      );
+      addTearDown(store.dispose);
+
+      await store.verify(goalTitle: 'Math');
+
+      expect(store.status, EvidenceVerificationStatus.idle);
+      expect(store.result, isNull);
+    });
+
+    test('verify สำเร็จ (passed) → status passed + result เก็บ', () async {
+      final store = EvidenceVerificationStore(
+        verifier: _FakeVerifier(VerificationResult.accepted),
+      );
+      addTearDown(store.dispose);
+      store.setEvidence([1, 2, 3]);
+
+      await store.verify(goalTitle: 'Practice Python');
+
+      expect(store.status, EvidenceVerificationStatus.passed);
+      expect(store.result, isNotNull);
+      expect(store.result!.passed, isTrue);
+    });
+
+    test('verify ไม่ผ่าน (rejected) → status rejected', () async {
+      final store = EvidenceVerificationStore(
+        verifier: _FakeVerifier(VerificationResult.rejected),
+      );
+      addTearDown(store.dispose);
+      store.setEvidence([9]);
+
+      await store.verify(goalTitle: 'Read a book');
+
+      expect(store.status, EvidenceVerificationStatus.rejected);
+      expect(store.result!.passed, isFalse);
+    });
+
+    test('verifier โยน exception → status error โดยไม่ crash', () async {
+      final store = EvidenceVerificationStore(
+        verifier: _ThrowingVerifier(),
+      );
+      addTearDown(store.dispose);
+      store.setEvidence([1]);
+
+      await store.verify(goalTitle: 'Math');
+
+      expect(store.status, EvidenceVerificationStatus.error);
+      expect(store.result, isNull);
+    });
+
+    test('double submit ถูกป้องกัน (verify ซ้อนระหว่าง verifying)', () async {
+      final verifier = _SlowVerifier(VerificationResult.accepted);
+      final store = EvidenceVerificationStore(verifier: verifier);
+      addTearDown(store.dispose);
+      store.setEvidence([1]);
+
+      final first = store.verify(goalTitle: 'Math');
+      // ยังไม่ await → status ควรเป็น verifying
+      expect(store.status, EvidenceVerificationStatus.verifying);
+
+      // เรียก verify ซ้อนทันที → no-op (guard)
+      await store.verify(goalTitle: 'Math');
+
+      // ปล่อยให้ first จบ
+      verifier.complete();
+      await first;
+
+      expect(store.status, EvidenceVerificationStatus.passed);
+    });
+
+    test('reset หลัง rejected → กลับ idle (เก็บ evidence ไว้)', () async {
+      final store = EvidenceVerificationStore(
+        verifier: _FakeVerifier(VerificationResult.rejected),
+      );
+      addTearDown(store.dispose);
+      store.setEvidence([1]);
+      await store.verify(goalTitle: 'Math');
+      expect(store.status, EvidenceVerificationStatus.rejected);
+
+      store.reset();
+
+      expect(store.status, EvidenceVerificationStatus.idle);
+      expect(store.hasEvidence, isTrue); // evidence ยังอยู่
+      expect(store.result, isNull);
+    });
+
+    test('clearEvidence → idle + ไม่มี evidence + ไม่มี result', () {
+      final store = EvidenceVerificationStore(
+        verifier: _FakeVerifier(VerificationResult.accepted),
+      );
+      addTearDown(store.dispose);
+      store.setEvidence([1, 2]);
+
+      store.clearEvidence();
+
+      expect(store.status, EvidenceVerificationStatus.idle);
+      expect(store.hasEvidence, isFalse);
+      expect(store.result, isNull);
+    });
+  });
+
+  group('EvidenceVerificationPage — UI states', () {
+    // image bytes fixture ขนาดเล็ก (PNG signature + ขยะ) — ไม่ใช่รูปจริงแต่พอ preview errorBuilder
+    final fakeImage = <int>[
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+      for (var i = 0; i < 64; i++) 0,
+    ];
+
+    Widget harness({
+      required EvidenceVerifier verifier,
+      VoidCallback onChoose = _noop,
+    }) {
+      return MaterialApp(
+        home: EvidenceVerificationScreen(
+          verifier: verifier,
+          goalTitle: 'Practice Python',
+          onChooseEvidence: onChoose,
+        ),
+      );
+    }
+
+    Future<void> pumpCompact(WidgetTester tester) async {
+      // หน้านี้ค่อนข้างสูง (header + goal + preview 4:3 + status + CTA) →
+      // ใช้ surface สูงพอให้ปุ่มอยู่ใน viewport ตอน test (จำลอง compact 390x1200)
+      await tester.binding.setSurfaceSize(const Size(390, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+    }
+
+    testWidgets('idle: แสดง Goal ถูกต้อง + Verify disabled', (tester) async {
+      await pumpCompact(tester);
+      await tester.pumpWidget(
+        harness(verifier: _FakeVerifier(VerificationResult.accepted)),
+      );
+      await tester.pumpAndSettle();
+
+      // Goal context
+      expect(find.textContaining('Practice Python'), findsWidgets);
+      // empty state
+      expect(find.text('Add study evidence'), findsOneWidget);
+      // Verify disabled (label ปุ่ม present, onPressed null)
+      final btn = _findPrimaryButton(tester);
+      expect(btn.onPressed, isNull);
+    });
+
+    testWidgets('evidence พร้อม → Verify enabled + แตะ empty state trigger onChoose',
+        (tester) async {
+      await pumpCompact(tester);
+      final onChoose = _CallbackHolder();
+      await tester.pumpWidget(
+        harness(
+          verifier: _FakeVerifier(VerificationResult.accepted),
+          onChoose: () => onChoose.call(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // แตะ empty preview → trigger onChoose (Sprint 9B เสียบ picker จริง)
+      await tester.tap(find.text('Add study evidence'));
+      await tester.pump();
+      expect(onChoose.called, isTrue);
+
+      // ทดสอบ enabled จริงด้วย harness ที่ setEvidence ล่วงหน้า
+      await tester.pumpWidget(
+        _harnessWithEvidence(
+          verifier: _FakeVerifier(VerificationResult.accepted),
+          bytes: fakeImage,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final btn = _findPrimaryButton(tester);
+      expect(btn.onPressed, isNotNull); // enabled
+    });
+
+    testWidgets('verifying: ป้องกัน submit ซ้ำ + loading', (tester) async {
+      await pumpCompact(tester);
+      final verifier = _SlowVerifier(VerificationResult.accepted);
+      await tester.pumpWidget(
+        _harnessWithEvidence(verifier: verifier, bytes: fakeImage),
+      );
+      await tester.pumpAndSettle();
+
+      // กด Verify
+      await tester.tap(find.text('Verify Evidence'));
+      await tester.pump(); // เริ่ม verifying
+
+      expect(find.text('Checking your evidence…'), findsOneWidget);
+      // ปุ่มเป็น "Checking…" disabled
+      expect(find.text('Checking…'), findsOneWidget);
+
+      // กดซ้อน → ไม่เกิดอะไร
+      await tester.tap(find.text('Checking…'), warnIfMissed: false);
+
+      // ปล่อยให้ verifier จบ
+      verifier.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Evidence verified'), findsOneWidget);
+    });
+
+    testWidgets('passed: แสดง success + reason', (tester) async {
+      await pumpCompact(tester);
+      await tester.pumpWidget(
+        _harnessWithEvidence(
+          verifier: _FakeVerifier(const VerificationResult(
+            passed: true,
+            confidence: 0.92,
+            reason: 'This appears related to your study goal.',
+          )),
+          bytes: fakeImage,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // กด Verify แล้วรอผล
+      await tester.tap(find.text('Verify Evidence'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Evidence verified'), findsOneWidget);
+      expect(find.text('This appears related to your study goal.'), findsOneWidget);
+      // confidence เป็น secondary
+      expect(find.textContaining('Confidence'), findsOneWidget);
+      // ไม่ commit/ไม่แจก XP → แค่ Done
+      expect(find.text('Done'), findsOneWidget);
+    });
+
+    testWidgets('rejected: แสดง reject + Try Another + retry', (tester) async {
+      await pumpCompact(tester);
+      await tester.pumpWidget(
+        _harnessWithEvidence(
+          verifier: _FakeVerifier(VerificationResult.rejected),
+          bytes: fakeImage,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Verify Evidence'));
+      await tester.pumpAndSettle();
+
+      expect(find.text("Evidence doesn’t match"), findsOneWidget);
+      // ปุ่ม Try Another Evidence + verify again
+      expect(find.text('Try Another Evidence'), findsOneWidget);
+      expect(find.text('Verify this image again'), findsOneWidget);
+    });
+
+    testWidgets('error: verifier throw → error state ไม่ crash + retry',
+        (tester) async {
+      await pumpCompact(tester);
+      await tester.pumpWidget(
+        _harnessWithEvidence(
+          verifier: _ThrowingVerifier(),
+          bytes: fakeImage,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Verify Evidence'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Couldn’t verify evidence'), findsOneWidget);
+      expect(find.text('Retry'), findsOneWidget);
+      expect(find.text('Choose another evidence'), findsOneWidget);
+      // ไม่ crash — test มาถึงบรรทัดนี้ได้
+    });
+
+    testWidgets('retry/reset กลับไปพร้อมเลือก evidence ใหม่', (tester) async {
+      await pumpCompact(tester);
+      final onChoose = _CallbackHolder();
+      await tester.pumpWidget(
+        _harnessWithEvidence(
+          verifier: _FakeVerifier(VerificationResult.rejected),
+          bytes: fakeImage,
+          onChoose: () => onChoose.call(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Verify Evidence'));
+      await tester.pumpAndSettle();
+
+      // กด Try Another Evidence → trigger onChoose (เลือกใหม่)
+      await tester.tap(find.text('Try Another Evidence'));
+      await tester.pump();
+      expect(onChoose.called, isTrue);
+    });
+  });
 }
+
+// =============================================================================
+// Test doubles & helpers (Sprint 9A) — เฉพาะ test เท่านั้น
+// =============================================================================
+
+void _noop() {}
+
+class _CallbackHolder {
+  bool called = false;
+  void Function()? next;
+  void call() {
+    called = true;
+    next?.call();
+  }
+}
+
+/// ดึง AppPressButton หลัก (แรกที่เจอ) ในหน้า — ใช้ตรวจ enabled/disabled
+AppPressButton _findPrimaryButton(WidgetTester tester) {
+  return tester.widget<AppPressButton>(find.byType(AppPressButton).first);
+}
+
+/// Fake verifier ที่คืน result ทันที
+class _FakeVerifier implements EvidenceVerifier {
+  _FakeVerifier(this.result);
+  final VerificationResult result;
+
+  @override
+  Future<VerificationResult> verify({
+    required String goalTitle,
+    required List<int> imageBytes,
+  }) async {
+    // อนุญาตให้ event loop หมุน 1 รอบ (จำลอง async เล็กน้อย) แต่ไม่ delay จริง
+    await Future<void>.delayed(Duration.zero);
+    return result;
+  }
+}
+
+/// Fake verifier ที่โยน exception เสมอ (test error state)
+class _ThrowingVerifier implements EvidenceVerifier {
+  @override
+  Future<VerificationResult> verify({
+    required String goalTitle,
+    required List<int> imageBytes,
+  }) async {
+    await Future<void>.delayed(Duration.zero);
+    throw Exception('boom');
+  }
+}
+
+/// Fake verifier ที่รอให้ complete() ถึงจะคืน result (test verifying/double-submit)
+class _SlowVerifier implements EvidenceVerifier {
+  _SlowVerifier(this.result);
+  final VerificationResult result;
+  final _completer = Completer<VerificationResult>();
+
+  void complete() => _completer.complete(result);
+
+  @override
+  Future<VerificationResult> verify({
+    required String goalTitle,
+    required List<int> imageBytes,
+  }) {
+    return _completer.future;
+  }
+}
+
+/// harness ที่ set evidence ล่วงหน้า (จำลองผู้ใช้เลือกรูปแล้ว)
+Widget _harnessWithEvidence({
+  required EvidenceVerifier verifier,
+  required List<int> bytes,
+  VoidCallback onChoose = _noop,
+}) {
+  return MaterialApp(
+    home: _PreseedEvidenceScreen(
+      verifier: verifier,
+      bytes: bytes,
+      onChoose: onChoose,
+    ),
+  );
+}
+
+/// Screen ที่ set evidence ใน initState ก่อน pump (เพื่อทดสอบ state หลังเลือกรูป)
+class _PreseedEvidenceScreen extends StatefulWidget {
+  const _PreseedEvidenceScreen({
+    required this.verifier,
+    required this.bytes,
+    required this.onChoose,
+  });
+  final EvidenceVerifier verifier;
+  final List<int> bytes;
+  final VoidCallback onChoose;
+
+  @override
+  State<_PreseedEvidenceScreen> createState() => _PreseedEvidenceScreenState();
+}
+
+class _PreseedEvidenceScreenState extends State<_PreseedEvidenceScreen> {
+  late final EvidenceVerificationStore _store;
+
+  @override
+  void initState() {
+    super.initState();
+    _store = EvidenceVerificationStore(verifier: widget.verifier)
+      ..setEvidence(widget.bytes);
+  }
+
+  @override
+  void dispose() {
+    _store.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return EvidenceVerificationStoreProvider(
+      notifier: _store,
+      child: EvidenceVerificationPage(
+        goalTitle: 'Practice Python',
+        onChooseEvidence: widget.onChoose,
+      ),
+    );
+  }
+}
+
